@@ -263,7 +263,7 @@ export async function generateInvoiceForPeriod(
 export async function sendInvoice(
   invoiceId: string,
   tenantId: string
-): Promise<void> {
+): Promise<any> {
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
     include: {
@@ -285,16 +285,22 @@ export async function sendInvoice(
   }
 
   // Update invoice status
-  await prisma.invoice.update({
+  const updatedInvoice = await prisma.invoice.update({
     where: { id: invoiceId },
     data: {
       status: "SENT",
       issuedDate: new Date(), // Update issued date to send date
     },
+    include: {
+      client: true,
+      lineItems: true,
+    },
   })
 
   // TODO: Send email notification to client
   // await sendInvoiceEmail(invoice, client)
+
+  return updatedInvoice
 }
 
 /**
@@ -308,7 +314,7 @@ export async function markInvoicePaid(
   invoiceId: string,
   tenantId: string,
   paidDate: Date = new Date()
-): Promise<void> {
+): Promise<any> {
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId },
   })
@@ -321,11 +327,15 @@ export async function markInvoicePaid(
     throw new Error("Unauthorized")
   }
 
-  await prisma.invoice.update({
+  return await prisma.invoice.update({
     where: { id: invoiceId },
     data: {
       status: "PAID",
       paidDate,
+    },
+    include: {
+      client: true,
+      lineItems: true,
     },
   })
 }
