@@ -73,6 +73,12 @@ export default async function DashboardLayout({
             >
               Invoices
             </a>
+            <a
+              href="/dashboard/expenses"
+              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              Expenses
+            </a>
             {session.user.role === "ADMIN" && (
               <>
                 <div className="my-2 border-t" />

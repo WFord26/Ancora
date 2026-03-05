@@ -1179,22 +1179,23 @@ Built into the architecture from day one:
 - ✅ Basic retainer creation and management (+ overage rates, cancel/edit/delete, travel config)
 - ✅ Time entry (manual) with categories and notes
 
-### Phase 2 — Billing Core (Weeks 4–6) 🚧 IN PROGRESS
-- 🚧 Retainer period management and rollover logic
-- 🚧 Overage tier calculation engine
-- 🚧 Invoice generation (internal, PDF export)
-- ⏳ Stripe integration (customer, payment links, autopay)
+### Phase 2 — Billing Core (Weeks 4–6) ✅ COMPLETE
+- ✅ Retainer period management and rollover logic
+- ✅ Overage tier calculation engine
+- ✅ Invoice generation (internal, PDF export)
+- ✅ Stripe integration (customer, payment links, autopay)
 - ✅ Expense tracking schema (models added to database)
-- ⏳ Expense tracking with document upload (Azure Blob Storage)
-- ⏳ Expense approval workflow
-- ⏳ Expense to invoice integration (billable expenses)
+- ✅ Expense tracking with document upload (Azure Blob Storage)
+- ✅ Expense approval workflow
+- ✅ Expense to invoice integration (billable expenses)
+- ✅ BullMQ billing cycle worker
 
-### Phase 3 — Client Portal (Weeks 7–8)
-- Client authentication (separate login or magic link)
-- Dashboard: retainer balance, usage chart, recent entries
-- Invoice list and PDF downloads
-- Billable expense visibility (view expenses billed to them)
-- Payment status
+### Phase 3 — Client Portal (Weeks 7–8) ✅ COMPLETE
+- ✅ Client authentication (password + magic link login)
+- ✅ Dashboard: retainer balance, usage chart, recent entries
+- ✅ Invoice list and PDF downloads
+- ✅ Billable expense visibility (view expenses billed to them)
+- ✅ Payment status (Stripe Checkout integration)
 
 ### Phase 4 — Accounting Integration (Weeks 9–11)
 - OAuth connection flow for QBO/Xero/Odoo

@@ -16,6 +16,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
+    "worker": "tsx src/jobs/worker.ts",
+    "worker:dev": "tsx watch src/jobs/worker.ts",
     "test": "vitest",
     "test:e2e": "playwright test"
   },

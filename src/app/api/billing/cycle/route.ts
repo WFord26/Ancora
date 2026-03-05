@@ -189,3 +189,67 @@ export async function POST(request: NextRequest) {
     )
   }
 }
+
+/**
+ * GET /api/billing/cycle
+ * 
+ * Get billing cycle status - list active retainers with their current period.
+ * Admin/Staff only.
+ */
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (session.user.role === "CLIENT") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+    }
+
+    const retainers = await prisma.retainer.findMany({
+      where: {
+        tenantId: session.user.tenantId,
+        status: "ACTIVE",
+      },
+      include: {
+        client: { select: { companyName: true } },
+        periods: {
+          where: { status: "OPEN" },
+          take: 1,
+          orderBy: { periodStart: "desc" },
+        },
+      },
+      orderBy: { name: "asc" },
+    })
+
+    const data = retainers.map((retainer: any) => {
+      const currentPeriod = retainer.periods[0]
+      return {
+        retainerId: retainer.id,
+        retainerName: retainer.name,
+        clientName: retainer.client.companyName,
+        currentPeriod: currentPeriod
+          ? {
+              id: currentPeriod.id,
+              periodStart: currentPeriod.periodStart,
+              periodEnd: currentPeriod.periodEnd,
+              status: currentPeriod.status,
+              includedHours: Number(currentPeriod.includedHours),
+              usedHours: Number(currentPeriod.usedHours),
+              rolloverHoursIn: Number(currentPeriod.rolloverHoursIn),
+              isDue: currentPeriod.periodEnd <= new Date(),
+            }
+          : null,
+      }
+    })
+
+    return NextResponse.json({ data })
+  } catch (error: any) {
+    console.error("Error fetching billing cycle status:", error)
+    return NextResponse.json(
+      { error: error.message || "Failed to fetch billing cycle status" },
+      { status: 500 }
+    )
+  }
+}
