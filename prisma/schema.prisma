@@ -1,0 +1,554 @@
+// Prisma schema file
+// See Architecture.md section 5 for key entities
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// Tenancy & Auth
+// ============================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  settings  Json?
+  timezone  String   @default("America/New_York") // IANA timezone
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  users                  User[]
+  clients                Client[]
+  retainerTemplates      RetainerTemplate[]
+  retainers              Retainer[]
+  timeCategories         TimeCategory[]
+  timeEntries            TimeEntry[]
+  expenseCategories      ExpenseCategory[]
+  expenses               Expense[]
+  invoices               Invoice[]
+  integrationConnections IntegrationConnection[]
+
+  @@map("tenants")
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+  CLIENT
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String   @map("tenant_id")
+  email        String   @unique
+  name         String?
+  role         UserRole @default(STAFF)
+  passwordHash String?  @map("password_hash")
+  avatarUrl    String?  @map("avatar_url")
+  timezone     String? // IANA timezone, nullable → falls back to tenant
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+  expenses    Expense[]
+  approvedExpenses Expense[] @relation("ExpenseApprover")
+  expenseDocuments ExpenseDocument[]
+  accounts    Account[]
+  sessions    Session[]
+
+  @@index([tenantId])
+  @@map("users")
+}
+
+// NextAuth models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime @db.Timestamptz
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime @db.Timestamptz
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ============================================
+// Client & Retainer
+// ============================================
+
+model Client {
+  id                   String   @id @default(cuid())
+  tenantId             String   @map("tenant_id")
+  companyName          String   @map("company_name")
+  primaryContactName   String?  @map("primary_contact_name")
+  email                String?
+  phone                String?
+  address              String?
+  billingEmail         String?  @map("billing_email")
+  timezone             String? // IANA timezone, nullable → falls back to tenant
+  stripeCustomerId     String?  @unique @map("stripe_customer_id")
+  accountingCustomerId String?  @map("accounting_customer_id")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  retainers   Retainer[]
+  timeEntries TimeEntry[]
+  expenses    Expense[]
+  invoices    Invoice[]
+
+  @@unique([tenantId, companyName], map: "tenantId_companyName")
+  @@index([tenantId])
+  @@map("clients")
+}
+
+enum RolloverCapType {
+  PERCENTAGE
+  FIXED
+}
+
+enum TravelTimeBilling {
+  INCLUDED_HOURS  // Travel time counts against included hours
+  OVERAGE        // Travel time billed as overage
+  NON_BILLABLE   // Travel time not billed
+}
+
+model RetainerTemplate {
+  id                   String           @id @default(cuid())
+  tenantId             String           @map("tenant_id")
+  name                 String
+  description          String?
+  includedHours        Decimal          @map("included_hours") @db.Decimal(10, 2)
+  ratePerHour          Decimal          @map("rate_per_hour") @db.Decimal(10, 2)
+  overageRate          Decimal?         @map("overage_rate") @db.Decimal(10, 2) // Default overage rate if no tiers
+  overageTiers         Json?            @map("overage_tiers") // [{from_hours, to_hours, rate}]
+  rolloverEnabled      Boolean          @default(false) @map("rollover_enabled")
+  rolloverCapType      RolloverCapType? @map("rollover_cap_type")
+  rolloverCapValue     Decimal?         @map("rollover_cap_value") @db.Decimal(10, 2)
+  rolloverExpiryMonths Int?             @map("rollover_expiry_months")
+  travelTimeBilling     TravelTimeBilling? @map("travel_time_billing")
+  travelTimeRate        Decimal?           @map("travel_time_rate") @db.Decimal(10, 2)
+  travelExpensesEnabled Boolean            @default(false) @map("travel_expenses_enabled")
+  mileageRate           Decimal?           @map("mileage_rate") @db.Decimal(10, 4)
+  perDiemRate           Decimal?           @map("per_diem_rate") @db.Decimal(10, 2)
+  isActive             Boolean          @default(true) @map("is_active")
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant    Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  retainers Retainer[]
+
+  @@unique([tenantId, name], map: "retainer_template_tenant_name")
+  @@index([tenantId])
+  @@map("retainer_templates")
+}
+
+enum RetainerStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELLED
+}
+
+model Retainer {
+  id                   String           @id @default(cuid())
+  tenantId             String           @map("tenant_id")
+  clientId             String           @map("client_id")
+  templateId           String?          @map("template_id")
+  name                 String
+  status               RetainerStatus   @default(ACTIVE)
+  includedHours        Decimal          @map("included_hours") @db.Decimal(10, 2)
+  ratePerHour          Decimal          @map("rate_per_hour") @db.Decimal(10, 2)
+  overageRate          Decimal?         @map("overage_rate") @db.Decimal(10, 2) // Default overage rate if no tiers
+  overageTiers         Json?            @map("overage_tiers")
+  rolloverEnabled      Boolean          @default(false) @map("rollover_enabled")
+  rolloverCapType      RolloverCapType? @map("rollover_cap_type")
+  rolloverCapValue     Decimal?         @map("rollover_cap_value") @db.Decimal(10, 2)
+  rolloverExpiryMonths Int?             @map("rollover_expiry_months")
+  travelTimeBilling     TravelTimeBilling? @map("travel_time_billing")
+  travelTimeRate        Decimal?           @map("travel_time_rate") @db.Decimal(10, 2)
+  travelExpensesEnabled Boolean            @default(false) @map("travel_expenses_enabled")
+  mileageRate           Decimal?           @map("mileage_rate") @db.Decimal(10, 4)
+  perDiemRate           Decimal?           @map("per_diem_rate") @db.Decimal(10, 2)
+  timezone             String           @default("America/New_York") // IANA timezone
+  billingDay           Int              @default(1) @map("billing_day") // 1-28
+  startDate            DateTime         @map("start_date") @db.Date
+  endDate              DateTime?        @map("end_date") @db.Date
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client      Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  template    RetainerTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  periods     RetainerPeriod[]
+  timeEntries TimeEntry[]
+  expenses    Expense[]
+
+  @@index([tenantId])
+  @@index([clientId])
+  @@map("retainers")
+}
+
+enum PeriodStatus {
+  OPEN
+  CLOSED
+  BILLED
+}
+
+model RetainerPeriod {
+  id                 String       @id @default(cuid())
+  retainerId         String       @map("retainer_id")
+  periodStart        DateTime     @map("period_start") @db.Timestamptz
+  periodEnd          DateTime     @map("period_end") @db.Timestamptz
+  includedHours      Decimal      @map("included_hours") @db.Decimal(10, 2)
+  rolloverHoursIn    Decimal      @default(0) @map("rollover_hours_in") @db.Decimal(10, 2)
+  rolloverHoursOut   Decimal      @default(0) @map("rollover_hours_out") @db.Decimal(10, 2)
+  rolloverExpiryDate DateTime?    @map("rollover_expiry_date") @db.Date
+  usedHours          Decimal      @default(0) @map("used_hours") @db.Decimal(10, 2)
+  overageHours       Decimal      @default(0) @map("overage_hours") @db.Decimal(10, 2)
+  status             PeriodStatus @default(OPEN)
+  createdAt          DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  retainer    Retainer    @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+  invoices    Invoice[]
+
+  @@index([retainerId])
+  @@index([status])
+  @@map("retainer_periods")
+}
+
+// ============================================
+// Time Tracking
+// ============================================
+
+model TimeCategory {
+  id        String   @id @default(cuid())
+  tenantId  String   @map("tenant_id")
+  name      String
+  color     String   @default("#6366f1")
+  isActive  Boolean  @default(true) @map("is_active")
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timeEntries TimeEntry[]
+
+  @@unique([tenantId, name], map: "time_category_tenant_name")
+  @@index([tenantId])
+  @@map("time_categories")
+}
+
+enum TimeEntryStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+}
+
+model TimeEntry {
+  id                  String          @id @default(cuid())
+  tenantId            String          @map("tenant_id")
+  retainerId          String          @map("retainer_id")
+  retainerPeriodId    String          @map("retainer_period_id")
+  userId              String          @map("user_id")
+  clientId            String          @map("client_id")
+  categoryId          String?         @map("category_id")
+  startTime           DateTime        @map("start_time") @db.Timestamptz
+  endTime             DateTime        @map("end_time") @db.Timestamptz
+  durationMinutes     Int             @map("duration_minutes")
+  entryTimezone       String          @map("entry_timezone") // IANA timezone
+  externalDescription String          @map("external_description") @db.Text
+  internalNotes       String?         @map("internal_notes") @db.Text
+  isBillable          Boolean         @default(true) @map("is_billable")
+  status              TimeEntryStatus @default(APPROVED)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  retainer       Retainer       @relation(fields: [retainerId], references: [id], onDelete: Cascade)
+  retainerPeriod RetainerPeriod @relation(fields: [retainerPeriodId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  client         Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  category       TimeCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([retainerId])
+  @@index([userId])
+  @@index([clientId])
+  @@index([startTime])
+  @@map("time_entries")
+}
+
+// ============================================
+// Expense Tracking
+// ============================================
+
+model ExpenseCategory {
+  id        String    @id @default(cuid())
+  tenantId  String    @map("tenant_id")
+  name      String
+  color     String    @default("#6366f1")
+  isActive  Boolean   @default(true) @map("is_active")
+  sortOrder Int       @default(0) @map("sort_order")
+  glAccount String?   @map("gl_account") // Optional mapping for accounting integration
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  expenses Expense[]
+
+  @@index([tenantId])
+  @@map("expense_categories")
+}
+
+enum ExpenseStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  REIMBURSED
+}
+
+model Expense {
+  id               String          @id @default(cuid())
+  tenantId         String          @map("tenant_id")
+  clientId         String          @map("client_id")
+  retainerId       String?         @map("retainer_id")
+  userId           String          @map("user_id") // Who submitted it
+  categoryId       String          @map("category_id")
+  amount           Decimal         @db.Decimal(10, 2)
+  currency         String          @default("USD")
+  expenseDate      DateTime        @map("expense_date") @db.Date
+  merchant         String?
+  description      String
+  internalNotes    String?         @map("internal_notes") @db.Text
+  isBillable       Boolean         @default(true) @map("is_billable")
+  isReimbursable   Boolean         @default(false) @map("is_reimbursable")
+  status           ExpenseStatus   @default(DRAFT)
+  approvedBy       String?         @map("approved_by") // user_id of approver
+  approvedAt       DateTime?       @map("approved_at") @db.Timestamptz
+  rejectedReason   String?         @map("rejected_reason") @db.Text
+  invoiceId        String?         @map("invoice_id") // If included in invoice
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime        @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant    Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client    Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  retainer  Retainer?         @relation(fields: [retainerId], references: [id], onDelete: SetNull)
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  ExpenseCategory   @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  approver  User?             @relation("ExpenseApprover", fields: [approvedBy], references: [id], onDelete: SetNull)
+  invoice   Invoice?          @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
+  lineItems InvoiceLineItem[]
+  documents ExpenseDocument[]
+
+  @@index([tenantId])
+  @@index([clientId])
+  @@index([userId])
+  @@index([status])
+  @@index([expenseDate])
+  @@map("expenses")
+}
+
+model ExpenseDocument {
+  id         String   @id @default(cuid())
+  expenseId  String   @map("expense_id")
+  fileName   String   @map("file_name")
+  fileSize   Int      @map("file_size")
+  mimeType   String   @map("mime_type")
+  blobUrl    String   @map("blob_url") // Azure Blob Storage path
+  uploadedBy String   @map("uploaded_by") // user_id
+  uploadedAt DateTime @default(now()) @map("uploaded_at") @db.Timestamptz
+  isReceipt  Boolean  @default(true) @map("is_receipt") // Primary receipt vs supporting doc
+
+  expense  Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+  uploader User    @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  @@index([expenseId])
+  @@map("expense_documents")
+}
+
+// ============================================
+// Billing & Invoicing
+// ============================================
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PAID
+  OVERDUE
+  VOID
+}
+
+model Invoice {
+  id                  String        @id @default(cuid())
+  tenantId            String        @map("tenant_id")
+  clientId            String        @map("client_id")
+  retainerPeriodId    String?       @map("retainer_period_id")
+  invoiceNumber       String        @unique @map("invoice_number")
+  status              InvoiceStatus @default(DRAFT)
+  issuedDate          DateTime      @map("issued_date") @db.Date
+  dueDate             DateTime      @map("due_date") @db.Date
+  paidDate            DateTime?     @map("paid_date") @db.Date
+  subtotal            Decimal       @db.Decimal(10, 2)
+  tax                 Decimal       @default(0) @db.Decimal(10, 2)
+  total               Decimal       @db.Decimal(10, 2)
+  stripeInvoiceId     String?       @map("stripe_invoice_id")
+  accountingInvoiceId String?       @map("accounting_invoice_id")
+  pdfUrl              String?       @map("pdf_url")
+  createdAt           DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant         Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client         Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  retainerPeriod RetainerPeriod?   @relation(fields: [retainerPeriodId], references: [id], onDelete: SetNull)
+  lineItems      InvoiceLineItem[]
+  expenses       Expense[]
+  payments       Payment[]
+
+  @@index([tenantId])
+  @@index([clientId])
+  @@index([status])
+  @@map("invoices")
+}
+
+enum LineItemType {
+  RETAINER_FEE
+  OVERAGE
+  ROLLOVER_CREDIT
+  EXPENSE
+  ADJUSTMENT
+}
+
+model InvoiceLineItem {
+  id          String       @id @default(cuid())
+  invoiceId   String       @map("invoice_id")
+  description String
+  quantity    Decimal      @db.Decimal(10, 2)
+  unitPrice   Decimal      @map("unit_price") @db.Decimal(10, 2)
+  total       Decimal      @db.Decimal(10, 2)
+  lineType    LineItemType @map("line_type")
+  expenseId   String?      @map("expense_id") // If line item is for an expense
+
+  invoice Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  expense Expense? @relation(fields: [expenseId], references: [id], onDelete: SetNull)
+
+  @@index([invoiceId])
+  @@map("invoice_line_items")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  invoiceId             String        @map("invoice_id")
+  amount                Decimal       @db.Decimal(10, 2)
+  paymentMethod         String?       @map("payment_method")
+  stripePaymentIntentId String?       @map("stripe_payment_intent_id")
+  status                PaymentStatus @default(PENDING)
+  paidAt                DateTime?     @map("paid_at") @db.Timestamptz
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("payments")
+}
+
+// ============================================
+// Integration & Sync
+// ============================================
+
+enum IntegrationProvider {
+  QBO
+  XERO
+  ODOO
+  STRIPE
+}
+
+enum IntegrationStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+model IntegrationConnection {
+  id           String              @id @default(cuid())
+  tenantId     String              @map("tenant_id")
+  provider     IntegrationProvider
+  accessToken  String?             @map("access_token") @db.Text // encrypted
+  refreshToken String?             @map("refresh_token") @db.Text // encrypted
+  tokenExpiry  DateTime?           @map("token_expiry") @db.Timestamptz
+  config       Json?
+  status       IntegrationStatus   @default(ACTIVE)
+  lastSyncAt   DateTime?           @map("last_sync_at") @db.Timestamptz
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  syncLogs SyncLog[]
+
+  @@index([tenantId])
+  @@map("integration_connections")
+}
+
+enum SyncDirection {
+  IN
+  OUT
+}
+
+enum SyncStatus {
+  SUCCESS
+  FAILED
+}
+
+model SyncLog {
+  id            String        @id @default(cuid())
+  integrationId String        @map("integration_id")
+  direction     SyncDirection
+  entityType    String        @map("entity_type")
+  entityId      String?       @map("entity_id")
+  externalId    String?       @map("external_id")
+  status        SyncStatus
+  errorMessage  String?       @map("error_message") @db.Text
+  syncedAt      DateTime      @default(now()) @map("synced_at") @db.Timestamptz
+
+  integration IntegrationConnection @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([entityType, entityId])
+  @@map("sync_logs")
+}
