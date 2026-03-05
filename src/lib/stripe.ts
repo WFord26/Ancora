@@ -1,6 +1,7 @@
 import Stripe from "stripe"
 import { prisma } from "@/db"
 import { decimalToNumber } from "@/lib/billing"
+import { sendPaymentReceivedNotification, sendAdminPaymentNotification } from "@/lib/email"
 
 // ============================================
 // Stripe Client Singleton
@@ -365,6 +366,47 @@ export async function handlePaymentSucceeded(
   })
 
   console.log(`Invoice ${invoiceId} marked as PAID via Stripe payment ${paymentIntent.id}`)
+
+  // Send payment confirmation emails
+  try {
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        client: { select: { companyName: true, email: true, billingEmail: true } },
+        tenant: { select: { name: true } },
+      },
+    })
+
+    if (invoice) {
+      const clientEmail = invoice.client.billingEmail || invoice.client.email
+      const amount = paymentIntent.amount / 100
+
+      if (clientEmail) {
+        await sendPaymentReceivedNotification({
+          to: clientEmail,
+          clientName: invoice.client.companyName,
+          invoiceNumber: invoice.invoiceNumber,
+          amount,
+          paymentDate: new Date().toLocaleDateString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+          }),
+        })
+      }
+
+      // Notify admin
+      await sendAdminPaymentNotification({
+        to: process.env.ADMIN_EMAIL || "admin@ancora.app",
+        clientName: invoice.client.companyName,
+        invoiceNumber: invoice.invoiceNumber,
+        amount,
+      })
+    }
+  } catch (emailError) {
+    console.error("Failed to send payment notification emails:", emailError)
+    // Don't throw — payment was already processed successfully
+  }
 }
 
 /**

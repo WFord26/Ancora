@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/db"
 import crypto from "crypto"
+import { sendMagicLinkEmail } from "@/lib/email"
 
 /**
  * POST /api/auth/magic-link
@@ -72,14 +73,18 @@ export async function POST(request: NextRequest) {
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
     const magicLink = `${baseUrl}/api/auth/magic-link/verify?token=${token}&email=${encodeURIComponent(normalizedEmail)}`
 
-    // TODO: Send email via Resend or Azure Communication Services
-    // For now, log to console in development
-    console.log("========================================")
-    console.log("  MAGIC LINK LOGIN")
-    console.log(`  Email: ${normalizedEmail}`)
-    console.log(`  Link: ${magicLink}`)
-    console.log(`  Expires: ${expires.toISOString()}`)
-    console.log("========================================")
+    // Send magic link email
+    await sendMagicLinkEmail({ to: normalizedEmail, loginUrl: magicLink })
+
+    // Also log in development for debugging
+    if (process.env.NODE_ENV === "development") {
+      console.log("========================================")
+      console.log("  MAGIC LINK LOGIN")
+      console.log(`  Email: ${normalizedEmail}`)
+      console.log(`  Link: ${magicLink}`)
+      console.log(`  Expires: ${expires.toISOString()}`)
+      console.log("========================================")
+    }
 
     return successResponse
   } catch (error: any) {

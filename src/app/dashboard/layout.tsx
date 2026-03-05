@@ -1,6 +1,8 @@
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
+import { Suspense } from "react"
 import { authOptions } from "@/lib/auth"
+import TimerWrapper from "@/components/dashboard/timer-wrapper"
 
 export default async function DashboardLayout({
   children,
@@ -79,6 +81,12 @@ export default async function DashboardLayout({
             >
               Expenses
             </a>
+            <a
+              href="/dashboard/reports"
+              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              Reports
+            </a>
             {session.user.role === "ADMIN" && (
               <>
                 <div className="my-2 border-t" />
@@ -104,6 +112,11 @@ export default async function DashboardLayout({
           {children}
         </main>
       </div>
+
+      {/* Floating Timer */}
+      <Suspense fallback={null}>
+        <TimerWrapper />
+      </Suspense>
     </div>
   )
 }

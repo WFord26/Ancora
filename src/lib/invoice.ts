@@ -8,6 +8,7 @@
 import { prisma } from "@/db"
 import { Prisma } from "@prisma/client"
 import { addDays, format } from "date-fns"
+import { sendInvoiceNotification } from "@/lib/email"
 import { decimalToNumber, numberToDecimal, type OverageResult } from "./billing"
 
 // ============================================
@@ -297,8 +298,24 @@ export async function sendInvoice(
     },
   })
 
-  // TODO: Send email notification to client
-  // await sendInvoiceEmail(invoice, client)
+  // Send email notification to client
+  const clientEmail = updatedInvoice.client.billingEmail || updatedInvoice.client.email
+  if (clientEmail) {
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+    try {
+      await sendInvoiceNotification({
+        to: clientEmail,
+        clientName: updatedInvoice.client.companyName,
+        invoiceNumber: updatedInvoice.invoiceNumber,
+        amount: Number(updatedInvoice.total),
+        dueDate: format(new Date(updatedInvoice.dueDate), "MMMM d, yyyy"),
+        portalUrl: `${baseUrl}/portal/invoices/${updatedInvoice.id}`,
+      })
+    } catch (emailError) {
+      console.error("Failed to send invoice email:", emailError)
+      // Don't throw — invoice was already marked as sent
+    }
+  }
 
   return updatedInvoice
 }
