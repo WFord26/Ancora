@@ -66,7 +66,11 @@ const createClientSchema = z.object({
   primaryContactName: z.string().optional(),
   email: z.string().email().optional().or(z.literal("")),
   phone: z.string().optional(),
-  address: z.string().optional(),
+  addressLine1: z.string().optional(),
+  addressLine2: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
   billingEmail: z.string().email().optional().or(z.literal("")),
   timezone: z.string().optional(),
 })

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, RolloverCapType } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
@@ -78,14 +78,24 @@ async function main() {
   console.log('✅ Created time categories')
 
   // Create retainer templates
-  const templates = [
+  const templates: Array<{
+    name: string
+    description: string
+    includedHours: number
+    ratePerHour: number
+    rolloverEnabled: boolean
+    rolloverCapType: RolloverCapType | null
+    rolloverCapValue: number | null
+    rolloverExpiryMonths: number | null
+    overageTiers: Array<{ from: number; to: number | null; rate: number }>
+  }> = [
     {
       name: 'Bronze',
       description: 'Entry-level support retainer',
       includedHours: 10,
       ratePerHour: 150,
       rolloverEnabled: true,
-      rolloverCapType: 'PERCENTAGE',
+      rolloverCapType: RolloverCapType.PERCENTAGE,
       rolloverCapValue: 25,
       rolloverExpiryMonths: 3,
       overageTiers: [
@@ -99,7 +109,7 @@ async function main() {
       includedHours: 20,
       ratePerHour: 140,
       rolloverEnabled: true,
-      rolloverCapType: 'PERCENTAGE',
+      rolloverCapType: RolloverCapType.PERCENTAGE,
       rolloverCapValue: 50,
       rolloverExpiryMonths: 3,
       overageTiers: [
@@ -113,7 +123,7 @@ async function main() {
       includedHours: 40,
       ratePerHour: 130,
       rolloverEnabled: true,
-      rolloverCapType: 'PERCENTAGE',
+      rolloverCapType: RolloverCapType.PERCENTAGE,
       rolloverCapValue: 50,
       rolloverExpiryMonths: 6,
       overageTiers: [

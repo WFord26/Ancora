@@ -39,14 +39,13 @@ export default async function InvoiceDetailPage({
           primaryContactName: true,
           email: true,
           billingEmail: true,
-          address: true,
         },
       },
       lineItems: {
-        orderBy: { id: \"asc\" },
+        orderBy: { id: "asc" },
       },
       payments: {
-        orderBy: { paidAt: \"desc\" },
+        orderBy: { paidAt: "desc" },
       },
     },
   })
@@ -138,9 +137,6 @@ export default async function InvoiceDetailPage({
             <p className="font-medium">{invoice.client.companyName}</p>
             {invoice.client.primaryContactName && (
               <p className="text-sm">{invoice.client.primaryContactName}</p>
-            )}
-            {invoice.client.address && (
-              <p className="text-sm whitespace-pre-line">{invoice.client.address}</p>
             )}
             {invoice.client.billingEmail && (
               <p className="text-sm">{invoice.client.billingEmail}</p>

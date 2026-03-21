@@ -66,6 +66,7 @@ export default function EditTimeEntryPage({ params }: { params: { id: string } }
       externalDescription: formData.get("externalDescription") as string,
       internalNotes: formData.get("internalNotes") as string || null,
       categoryId: formData.get("categoryId") as string || null,
+      isTravelTime: (formData.get("isTravelTime") === "on"),
     }
 
     try {
@@ -254,6 +255,22 @@ export default function EditTimeEntryPage({ params }: { params: { id: string } }
                 defaultValue={entry.internalNotes || ""}
                 rows={3}
               />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="isTravelTime"
+                name="isTravelTime"
+                defaultChecked={entry.isTravelTime}
+                className="h-4 w-4 rounded border"
+              />
+              <Label htmlFor="isTravelTime" className="cursor-pointer">
+                Travel Time
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  (billed on next invoice)
+                </span>
+              </Label>
             </div>
 
             <div className="flex gap-4">

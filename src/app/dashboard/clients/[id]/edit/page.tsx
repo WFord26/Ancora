@@ -6,8 +6,8 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { AddressForm } from "@/components/address-form"
 
 export default function EditClientPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -47,7 +47,11 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
       primaryContactName: formData.get("primaryContactName") as string || null,
       email: formData.get("email") as string || null,
       phone: formData.get("phone") as string || null,
-      address: formData.get("address") as string || null,
+      addressLine1: formData.get("addressLine1") as string || null,
+      addressLine2: formData.get("addressLine2") as string || null,
+      city: formData.get("city") as string || null,
+      state: formData.get("state") as string || null,
+      zipCode: formData.get("zipCode") as string || null,
       billingEmail: formData.get("billingEmail") as string || null,
       timezone: formData.get("timezone") as string || null,
       isActive: formData.get("isActive") === "true",
@@ -148,35 +152,31 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
               </div>
             </div>
 
+            <AddressForm data={{
+              addressLine1: client.addressLine1,
+              addressLine2: client.addressLine2,
+              city: client.city,
+              state: client.state,
+              zipCode: client.zipCode,
+            }} />
+
             <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Textarea
-                id="address"
-                name="address"
-                defaultValue={client.address || ""}
-                rows={3}
+              <Label htmlFor="billingEmail">Billing Email</Label>
+              <Input
+                id="billingEmail"
+                name="billingEmail"
+                type="email"
+                defaultValue={client.billingEmail || ""}
               />
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="billingEmail">Billing Email</Label>
-                <Input
-                  id="billingEmail"
-                  name="billingEmail"
-                  type="email"
-                  defaultValue={client.billingEmail || ""}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="timezone">Timezone</Label>
-                <Input
-                  id="timezone"
-                  name="timezone"
-                  defaultValue={client.timezone || ""}
-                />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="timezone">Timezone</Label>
+              <Input
+                id="timezone"
+                name="timezone"
+                defaultValue={client.timezone || ""}
+              />
             </div>
 
             <div className="space-y-2">

@@ -110,13 +110,6 @@ export default async function ClientDetailPage({
               </div>
             )}
 
-            {client.address && (
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Address</p>
-                <p className="mt-1 whitespace-pre-line">{client.address}</p>
-              </div>
-            )}
-
             {client.billingEmail && (
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Billing Email</p>

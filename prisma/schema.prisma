@@ -117,7 +117,11 @@ model Client {
   primaryContactName   String?  @map("primary_contact_name")
   email                String?
   phone                String?
-  address              String?
+  addressLine1         String?  @map("address_line_1")
+  addressLine2         String?  @map("address_line_2")
+  city                 String?
+  state                String?
+  zipCode              String?  @map("zip_code")
   billingEmail         String?  @map("billing_email")
   timezone             String? // IANA timezone, nullable → falls back to tenant
   stripeCustomerId     String?  @unique @map("stripe_customer_id")
@@ -145,6 +149,11 @@ enum TravelTimeBilling {
   INCLUDED_HOURS  // Travel time counts against included hours
   OVERAGE        // Travel time billed as overage
   NON_BILLABLE   // Travel time not billed
+}
+
+enum BillingCycle {
+  MONTHLY
+  BIWEEKLY
 }
 
 model RetainerTemplate {
@@ -204,7 +213,8 @@ model Retainer {
   mileageRate           Decimal?           @map("mileage_rate") @db.Decimal(10, 4)
   perDiemRate           Decimal?           @map("per_diem_rate") @db.Decimal(10, 2)
   timezone             String           @default("America/New_York") // IANA timezone
-  billingDay           Int              @default(1) @map("billing_day") // 1-28
+  billingCycle         BillingCycle     @default(MONTHLY) @map("billing_cycle") // MONTHLY or BIWEEKLY
+  billingDay           Int              @default(1) @map("billing_day") // 1-28 for monthly OR day of week for biweekly (0=Sunday)
   startDate            DateTime         @map("start_date") @db.Date
   endDate              DateTime?        @map("end_date") @db.Date
   createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz
@@ -292,6 +302,8 @@ model TimeEntry {
   externalDescription String          @map("external_description") @db.Text
   internalNotes       String?         @map("internal_notes") @db.Text
   isBillable          Boolean         @default(true) @map("is_billable")
+  isTravelTime        Boolean         @default(false) @map("is_travel_time") // Travel time tracked separately
+  invoiceId           String?         @map("invoice_id") // Links to invoice when billed
   status              TimeEntryStatus @default(APPROVED)
   createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz
@@ -302,6 +314,7 @@ model TimeEntry {
   user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   client         Client         @relation(fields: [clientId], references: [id], onDelete: Cascade)
   category       TimeCategory?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  invoice        Invoice?       @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([tenantId])
   @@index([retainerId])
@@ -433,6 +446,7 @@ model Invoice {
   client         Client            @relation(fields: [clientId], references: [id], onDelete: Cascade)
   retainerPeriod RetainerPeriod?   @relation(fields: [retainerPeriodId], references: [id], onDelete: SetNull)
   lineItems      InvoiceLineItem[]
+  timeEntries    TimeEntry[]
   expenses       Expense[]
   payments       Payment[]
 

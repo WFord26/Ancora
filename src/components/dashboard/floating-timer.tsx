@@ -55,6 +55,7 @@ export default function FloatingTimer({
   const [description, setDescription] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
   const [isBillable, setIsBillable] = useState(true)
+  const [isTravelTime, setIsTravelTime] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
   const [success, setSuccess] = useState("")
@@ -136,6 +137,7 @@ export default function FloatingTimer({
           externalDescription: description.trim(),
           internalNotes: internalNotes.trim() || undefined,
           isBillable,
+          isTravelTime,
         }),
       })
 
@@ -169,6 +171,7 @@ export default function FloatingTimer({
     selectedCategoryId,
     internalNotes,
     isBillable,
+    isTravelTime,
     userTimezone,
   ])
 
@@ -317,6 +320,23 @@ export default function FloatingTimer({
                   className="text-sm text-muted-foreground"
                 >
                   Billable
+                </label>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="timer-travel"
+                  checked={isTravelTime}
+                  onChange={(e) => setIsTravelTime(e.target.checked)}
+                  className="h-4 w-4 rounded border"
+                />
+                <label
+                  htmlFor="timer-travel"
+                  className="text-sm text-muted-foreground"
+                >
+                  Travel Time
+                  <span className="ml-1 text-xs opacity-60">(next invoice)</span>
                 </label>
               </div>
 

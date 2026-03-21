@@ -15,6 +15,7 @@ const timerStopSchema = z.object({
   externalDescription: z.string().min(1),
   internalNotes: z.string().optional(),
   isBillable: z.boolean().default(true),
+  isTravelTime: z.boolean().default(false),
 })
 
 /**
@@ -102,6 +103,7 @@ export async function POST(request: NextRequest) {
         externalDescription: validated.externalDescription,
         internalNotes: validated.internalNotes || null,
         isBillable: validated.isBillable,
+        isTravelTime: validated.isTravelTime,
         status: "APPROVED",
       },
       include: {

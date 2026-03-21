@@ -96,6 +96,7 @@ const createTimeEntrySchema = z.object({
   externalDescription: z.string().min(1, "Description is required"),
   internalNotes: z.string().optional(),
   isBillable: z.boolean().default(true),
+  isTravelTime: z.boolean().default(false),
 })
 
 export async function POST(request: NextRequest) {
@@ -193,6 +194,7 @@ export async function POST(request: NextRequest) {
         externalDescription: validatedData.externalDescription,
         internalNotes: validatedData.internalNotes,
         isBillable: validatedData.isBillable,
+        isTravelTime: validatedData.isTravelTime,
         status: "APPROVED",
       },
       include: {

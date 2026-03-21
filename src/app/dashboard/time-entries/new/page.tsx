@@ -16,6 +16,10 @@ export default function NewTimeEntryPage() {
   const [error, setError] = useState("")
   const [clients, setClients] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
+  const [selectedClientId, setSelectedClientId] = useState("")
+  const [retainers, setRetainers] = useState<any[]>([])
+  const [loadingRetainers, setLoadingRetainers] = useState(false)
+  const [isTravelTime, setIsTravelTime] = useState(false)
 
   useEffect(() => {
     // Fetch clients and categories
@@ -37,12 +41,41 @@ export default function NewTimeEntryPage() {
       })
   }, [])
 
+  // Fetch retainers when client is selected
+  useEffect(() => {
+    if (!selectedClientId) {
+      setRetainers([])
+      return
+    }
+
+    setLoadingRetainers(true)
+    fetch(`/api/retainers?clientId=${selectedClientId}&status=ACTIVE`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          setRetainers(data.data)
+        } else {
+          setRetainers([])
+        }
+        setLoadingRetainers(false)
+      })
+      .catch(() => {
+        setRetainers([])
+        setLoadingRetainers(false)
+      })
+  }, [selectedClientId])
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
     const formData = new FormData(e.currentTarget)
+    const retainerId = formData.get("retainerId") as string
+    
+    // Find timezone from selected retainer
+    const selectedRetainer = retainers.find((r) => r.id === retainerId)
+    const timezone = selectedRetainer?.client?.timezone || "America/New_York"
     
     // Combine date and time for start
     const startDate = formData.get("startDate") as string
@@ -55,12 +88,14 @@ export default function NewTimeEntryPage() {
     const endDateTime = `${endDate}T${endTime}`
 
     const data = {
-      clientId: formData.get("clientId") as string,
-      startTime: new Date(startDateTime).toISOString(),
-      endTime: new Date(endDateTime).toISOString(),
+      retainerId: retainerId,
+      startTime: startDateTime,
+      endTime: endDateTime,
+      timezone: timezone,
       externalDescription: formData.get("externalDescription") as string,
       internalNotes: formData.get("internalNotes") as string || null,
       categoryId: formData.get("categoryId") as string || null,
+      isTravelTime,
     }
 
     try {
@@ -83,12 +118,19 @@ export default function NewTimeEntryPage() {
     }
   }
 
-  // Get today's date in YYYY-MM-DD format
-  const today = new Date().toISOString().split("T")[0]
-  const now = new Date().toTimeString().slice(0, 5)
-  
-  // Default client from URL param
-  const defaultClientId = searchParams.get("clientId") || ""
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split("T")[0]
+    const now = new Date().toTimeString().slice(0, 5)
+    
+    // Default client from URL param
+    const defaultClientId = searchParams.get("clientId") || ""
+    
+    // Set client if provided in URL
+    useEffect(() => {
+      if (defaultClientId) {
+        setSelectedClientId(defaultClientId)
+      }
+    }, [defaultClientId])
 
   return (
     <div className="max-w-2xl space-y-6">
@@ -122,7 +164,8 @@ export default function NewTimeEntryPage() {
                 id="clientId"
                 name="clientId"
                 required
-                defaultValue={defaultClientId}
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="">Select a client</option>
@@ -133,6 +176,33 @@ export default function NewTimeEntryPage() {
                 ))}
               </select>
             </div>
+
+            {selectedClientId && (
+              <div className="space-y-2">
+                <Label htmlFor="retainerId">Retainer *</Label>
+                <select
+                  id="retainerId"
+                  name="retainerId"
+                  required
+                  disabled={loadingRetainers}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <option value="">
+                    {loadingRetainers ? "Loading retainers..." : "Select a retainer"}
+                  </option>
+                  {retainers.map((retainer) => (
+                    <option key={retainer.id} value={retainer.id}>
+                      {retainer.name}
+                    </option>
+                  ))}
+                </select>
+                {retainers.length === 0 && !loadingRetainers && selectedClientId && (
+                  <p className="text-xs text-muted-foreground">
+                    No active retainers for this client
+                  </p>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
@@ -219,6 +289,22 @@ export default function NewTimeEntryPage() {
                 placeholder="Internal notes (not visible to client)..."
                 rows={3}
               />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="isTravelTime"
+                checked={isTravelTime}
+                onChange={(e) => setIsTravelTime(e.target.checked)}
+                className="h-4 w-4 rounded border"
+              />
+              <Label htmlFor="isTravelTime" className="cursor-pointer">
+                Travel Time
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  (billed on next invoice)
+                </span>
+              </Label>
             </div>
 
             <div className="flex gap-4">

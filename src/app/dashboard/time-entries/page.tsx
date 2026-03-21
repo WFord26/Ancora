@@ -12,6 +12,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import TimesheetExportButton from "@/components/dashboard/timesheet-export-button"
 
 export default async function TimeEntriesPage({
   searchParams,
@@ -24,19 +25,30 @@ export default async function TimeEntriesPage({
     return null
   }
 
-  const timeEntries = await prisma.timeEntry.findMany({
-    where: {
-      tenantId: session.user.tenantId,
-      ...(searchParams.clientId && { clientId: searchParams.clientId }),
-    },
-    include: {
-      client: { select: { companyName: true } },
-      user: { select: { name: true } },
-      category: { select: { name: true } },
-    },
-    orderBy: { startTime: "desc" },
-    take: 100,
-  })
+  const [timeEntries, retainers] = await Promise.all([
+    prisma.timeEntry.findMany({
+      where: {
+        tenantId: session.user.tenantId,
+        ...(searchParams.clientId && { clientId: searchParams.clientId }),
+      },
+      include: {
+        client: { select: { companyName: true } },
+        user: { select: { name: true } },
+        category: { select: { name: true } },
+        invoice: { select: { invoiceNumber: true, id: true } },
+      },
+      orderBy: { startTime: "desc" },
+      take: 100,
+    }),
+    prisma.retainer.findMany({
+      where: {
+        tenantId: session.user.tenantId,
+        status: "ACTIVE",
+      },
+      select: { id: true, name: true, clientId: true },
+      orderBy: { name: "asc" },
+    }),
+  ])
 
   return (
     <div className="space-y-6">
@@ -47,9 +59,12 @@ export default async function TimeEntriesPage({
             Track billable hours and activities
           </p>
         </div>
+      <div className="flex items-center gap-3">
+        <TimesheetExportButton retainers={retainers} />
         <Link href="/dashboard/time-entries/new">
           <Button>+ New Time Entry</Button>
         </Link>
+      </div>
       </div>
 
       <div className="rounded-lg border bg-card">
@@ -61,6 +76,7 @@ export default async function TimeEntriesPage({
               <TableHead>Description</TableHead>
               <TableHead>User</TableHead>
               <TableHead>Category</TableHead>
+              <TableHead>Invoice #</TableHead>
               <TableHead className="text-right">Duration</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -68,7 +84,7 @@ export default async function TimeEntriesPage({
           <TableBody>
             {timeEntries.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell colSpan={8} className="text-center text-muted-foreground">
                   No time entries yet. Create your first time entry to get started.
                 </TableCell>
               </TableRow>
@@ -91,8 +107,27 @@ export default async function TimeEntriesPage({
                   </TableCell>
                   <TableCell>{entry.user.name}</TableCell>
                   <TableCell>{entry.category?.name || "-"}</TableCell>
+                  <TableCell>
+                    {entry.invoice ? (
+                      <Link
+                        href={`/dashboard/invoices/${entry.invoice.id}`}
+                        className="font-mono text-xs hover:underline"
+                      >
+                        {entry.invoice.invoiceNumber}
+                      </Link>
+                    ) : entry.isTravelTime ? (
+                      <Badge variant="secondary" className="text-xs">
+                        Travel – Next Bill
+                      </Badge>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">–</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     {Math.floor(entry.durationMinutes / 60)}h {entry.durationMinutes % 60}m
+                    {entry.isTravelTime && (
+                      <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">✈</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Link href={`/dashboard/time-entries/${entry.id}/edit`}>

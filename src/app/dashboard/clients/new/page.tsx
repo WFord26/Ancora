@@ -6,11 +6,63 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { AddressForm } from "@/components/address-form"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+
+// Common IANA timezones grouped by region
+const TIMEZONES = [
+  // Americas
+  { label: "America/Anchorage", group: "Americas" },
+  { label: "America/Chicago", group: "Americas" },
+  { label: "America/Denver", group: "Americas" },
+  { label: "America/Los_Angeles", group: "Americas" },
+  { label: "America/Mexico_City", group: "Americas" },
+  { label: "America/New_York", group: "Americas" },
+  { label: "America/Toronto", group: "Americas" },
+  { label: "America/Vancouver", group: "Americas" },
+  { label: "America/Argentina/Buenos_Aires", group: "Americas" },
+  { label: "America/Sao_Paulo", group: "Americas" },
+  // Europe
+  { label: "Europe/Amsterdam", group: "Europe" },
+  { label: "Europe/Berlin", group: "Europe" },
+  { label: "Europe/Brussels", group: "Europe" },
+  { label: "Europe/Dublin", group: "Europe" },
+  { label: "Europe/London", group: "Europe" },
+  { label: "Europe/Madrid", group: "Europe" },
+  { label: "Europe/Paris", group: "Europe" },
+  { label: "Europe/Rome", group: "Europe" },
+  { label: "Europe/Vienna", group: "Europe" },
+  { label: "Europe/Zurich", group: "Europe" },
+  // Asia
+  { label: "Asia/Bangkok", group: "Asia" },
+  { label: "Asia/Dubai", group: "Asia" },
+  { label: "Asia/Hong_Kong", group: "Asia" },
+  { label: "Asia/Kolkata", group: "Asia" },
+  { label: "Asia/Shanghai", group: "Asia" },
+  { label: "Asia/Singapore", group: "Asia" },
+  { label: "Asia/Tokyo", group: "Asia" },
+  // Pacific
+  { label: "Australia/Sydney", group: "Pacific" },
+  { label: "Australia/Melbourne", group: "Pacific" },
+  { label: "Pacific/Auckland", group: "Pacific" },
+  // Africa
+  { label: "Africa/Cairo", group: "Africa" },
+  { label: "Africa/Johannesburg", group: "Africa" },
+  { label: "Africa/Lagos", group: "Africa" },
+  { label: "UTC", group: "Other" },
+]
 
 export default function NewClientPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const [timezone, setTimezone] = useState("")
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -20,12 +72,16 @@ export default function NewClientPage() {
     const formData = new FormData(e.currentTarget)
     const data = {
       companyName: formData.get("companyName") as string,
-      primaryContactName: formData.get("primaryContactName") as string,
-      email: formData.get("email") as string,
-      phone: formData.get("phone") as string,
-      address: formData.get("address") as string,
-      billingEmail: formData.get("billingEmail") as string,
-      timezone: formData.get("timezone") as string,
+      primaryContactName: formData.get("primaryContactName") as string || null,
+      email: formData.get("email") as string || null,
+      phone: formData.get("phone") as string || null,
+      addressLine1: formData.get("addressLine1") as string || null,
+      addressLine2: formData.get("addressLine2") as string || null,
+      city: formData.get("city") as string || null,
+      state: formData.get("state") as string || null,
+      zipCode: formData.get("zipCode") as string || null,
+      billingEmail: formData.get("billingEmail") as string || null,
+      timezone,
     }
 
     try {
@@ -115,14 +171,7 @@ export default function NewClientPage() {
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  name="address"
-                  placeholder="123 Main St, City, State 12345"
-                />
-              </div>
+              <AddressForm />
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
@@ -136,15 +185,19 @@ export default function NewClientPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="timezone">Timezone</Label>
-                  <Input
-                    id="timezone"
-                    name="timezone"
-                    placeholder="America/Denver"
-                  />
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    IANA timezone (e.g., America/New_York)
-                  </p>
+                  <Label htmlFor="timezone">Timezone *</Label>
+                  <Select value={timezone} onValueChange={setTimezone}>
+                    <SelectTrigger id="timezone">
+                      <SelectValue placeholder="Select a timezone" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEZONES.map((tz) => (
+                        <SelectItem key={tz.label} value={tz.label}>
+                          {tz.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

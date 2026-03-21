@@ -50,7 +50,7 @@ export default async function ExpenseDetailPage({
           fileName: true,
           mimeType: true,
           fileSize: true,
-          createdAt: true,
+          uploadedAt: true,
         },
         orderBy: { id: "desc" },
       },

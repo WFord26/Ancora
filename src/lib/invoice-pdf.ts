@@ -111,6 +111,15 @@ export async function getInvoicePdfData(
   // Extract tenant settings (company details)
   const settings = (invoice.tenant.settings as any) || {}
 
+  // Format company address
+  const companyAddressParts = [
+    settings.addressLine1,
+    settings.addressLine2,
+    [settings.city, settings.state, settings.zipCode]
+      .filter(Boolean)
+      .join(", "),
+  ].filter(Boolean)
+
   return {
     invoiceNumber: invoice.invoiceNumber,
     status: invoice.status,
@@ -120,16 +129,16 @@ export async function getInvoicePdfData(
       ? format(new Date(invoice.paidDate), "MMM d, yyyy")
       : undefined,
 
-    clientName: invoice.client.name,
+    clientName: invoice.client.companyName,
     clientEmail: invoice.client.email || "",
-    clientAddress: invoice.client.address || undefined,
+    clientAddress: invoice.client.addressLine1 || undefined,
     clientCity: invoice.client.city || undefined,
     clientState: invoice.client.state || undefined,
     clientZipCode: invoice.client.zipCode || undefined,
-    clientCountry: invoice.client.country || undefined,
+    clientCountry: undefined,
 
     companyName: invoice.tenant.name,
-    companyAddress: settings.address,
+    companyAddress: companyAddressParts.join("\n"),
     companyEmail: settings.email,
     companyPhone: settings.phone,
 

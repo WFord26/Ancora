@@ -43,7 +43,6 @@ export async function getOrCreateStripeCustomer(
       email: true,
       billingEmail: true,
       phone: true,
-      address: true,
       stripeCustomerId: true,
     },
   })

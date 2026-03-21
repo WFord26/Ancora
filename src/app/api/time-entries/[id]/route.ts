@@ -67,6 +67,7 @@ const updateTimeEntrySchema = z.object({
   externalDescription: z.string().min(1).optional(),
   internalNotes: z.string().optional(),
   isBillable: z.boolean().optional(),
+  isTravelTime: z.boolean().optional(),
   status: z.enum(["DRAFT", "SUBMITTED", "APPROVED"]).optional(),
 })
 
@@ -146,6 +147,7 @@ export async function PATCH(
     if (validatedData.externalDescription) updateData.externalDescription = validatedData.externalDescription
     if (validatedData.internalNotes !== undefined) updateData.internalNotes = validatedData.internalNotes
     if (validatedData.isBillable !== undefined) updateData.isBillable = validatedData.isBillable
+    if (validatedData.isTravelTime !== undefined) updateData.isTravelTime = validatedData.isTravelTime
     if (validatedData.status) updateData.status = validatedData.status
 
     const timeEntry = await prisma.timeEntry.update({

@@ -62,12 +62,12 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: any) {
       if (user) {
         token.id = user.id
         token.role = user.role
         token.tenantId = user.tenantId
-        token.timezone = user.timezone
+        token.timezone = user.timezone || "UTC"
       }
       return token
     },

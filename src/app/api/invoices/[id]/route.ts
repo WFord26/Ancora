@@ -29,14 +29,10 @@ export async function GET(
         client: {
           select: {
             id: true,
-            name: true,
+            companyName: true,
             email: true,
             phone: true,
-            address: true,
-            city: true,
-            state: true,
-            zipCode: true,
-            country: true,
+            billingEmail: true,
           },
         },
         retainerPeriod: {

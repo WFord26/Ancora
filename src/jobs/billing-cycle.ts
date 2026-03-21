@@ -43,7 +43,7 @@ let billingQueue: Queue | null = null
 export function getBillingQueue(): Queue {
   if (!billingQueue) {
     billingQueue = new Queue(QUEUE_NAME, {
-      connection: getRedisConnection(),
+      connection: getRedisConnection() as any,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -380,7 +380,7 @@ export function startBillingWorker(): Worker {
       }
     },
     {
-      connection: createRedisConnection(),
+      connection: createRedisConnection() as any,
       concurrency: 5,
       limiter: {
         max: 10,
