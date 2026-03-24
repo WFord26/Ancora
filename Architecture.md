@@ -1009,10 +1009,10 @@ for (const expense of billableExpenses) {
 ```
 
 **File Upload Security**
-- File type validation (PDF, JPG, PNG only)
+- File type validation (PDF, JPG, PNG, GIF, WEBP, CSV, Excel as configured)
 - File size limit: 10MB per document
 - Virus scanning before storage (Azure Defender)
-- Generate unique blob path: `{tenantId}/expenses/{expenseId}/{uuid}-{filename}`
+- Generate unique blob path: `{tenantId}/expenses/{expenseId}/{timestamp}_{filename}`
 - Return SAS token URL with 1-hour expiry for download
 - Delete orphaned files (expenses deleted before approval)
 
@@ -1066,7 +1066,7 @@ async function getDocumentDownloadUrl(documentId: string, session: Session) {
 
 ```typescript
 // ALWAYS validate tenantId matches session
-const client = await prisma.client.findUnique({
+const client = await prisma.client.findFirst({
   where: { id: clientId, tenantId: session.user.tenantId }
 })
 if (!client) throw new Error("Not found") // Don't leak existence
@@ -1095,7 +1095,7 @@ await prisma.auditLog.create({
     entityId: client.id,
     metadata: { changes: diff },
     ipAddress: req.headers['x-forwarded-for'],
-    timestamp: new Date()
+    userAgent: req.headers['user-agent']
   }
 })
 ```
