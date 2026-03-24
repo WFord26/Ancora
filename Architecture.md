@@ -2,7 +2,7 @@
 
 ## 1. Overview
 
-A cloud-hosted retainer time tracking and billing application for IT consulting. Built as a standalone Next.js application with PostgreSQL, deployed on Azure. Designed for single-tenant use today with a clear path to multi-tenant SaaS.
+A cloud-hosted retainer time tracking and billing application for IT consulting. Built as a standalone Next.js application with PostgreSQL, Redis, and Stripe, with Azure-oriented storage/deployment integrations. The current implementation already uses tenant-scoped data, onboarding, admin tenant management, client portal access, and subdomain-aware routing, while still leaving room for a fuller SaaS control plane later.
 
 ---
 
@@ -10,20 +10,20 @@ A cloud-hosted retainer time tracking and billing application for IT consulting.
 
 | Layer | Technology |
 |---|---|
-| Framework | Next.js 14+ (App Router, Server Actions) |
+| Framework | Next.js 14+ (App Router, route handlers, server components) |
 | Language | TypeScript (strict mode) |
 | Database | PostgreSQL 16 (Azure Database for PostgreSQL Flexible Server) |
 | ORM | Prisma |
-| Auth | NextAuth.js (Azure AD B2C for SaaS pivot) |
+| Auth | NextAuth.js with credentials auth, client magic links, invite-based onboarding |
 | Hosting | Azure App Service (or Azure Container Apps) |
-| File Storage | Azure Blob Storage (invoices, reports, exports) |
+| File Storage | Azure Blob Storage with private blobs + SAS URLs, local fallback for development |
 | Job Queue | BullMQ + Redis (Azure Cache for Redis) — for scheduled billing, rollover calculations |
-| Payments | Stripe SDK (Checkout, Invoicing, Customer Portal) |
-| Email | Azure Communication Services or Resend |
-| PDF Generation | @react-pdf/renderer or Puppeteer |
+| Payments | Stripe SDK (Checkout Sessions, Payment Intents, webhooks) |
+| Email | Resend (current) with Azure Communication Services as an alternative |
+| PDF Generation | HTML-based invoice/timesheet export today, Puppeteer-capable path for richer PDFs |
 | Timezone Handling | date-fns-tz (or Luxon) — all display/business logic conversions |
 | Testing | Vitest + Playwright |
-| UI Framework | Tailwind CSS 4 + shadcn/ui |
+| UI Framework | Tailwind CSS 3 + shadcn/ui |
 | Icons | Lucide React |
 | Charts | Recharts (or Tremor for dashboard components) |
 | Data Tables | TanStack Table (via shadcn/ui DataTable) |
@@ -42,6 +42,9 @@ npm run db:push           # Push Prisma schema to DB (dev)
 npm run db:migrate        # Create migration (production path)
 npm run db:studio         # Prisma Studio GUI
 npm run db:generate       # Regenerate Prisma Client after schema changes
+npm run db:seed           # Seed development data
+npm run worker            # Start BullMQ billing worker
+npm run worker:dev        # Start billing worker in watch mode
 npm test                  # Run Vitest tests
 npm run test:e2e          # Playwright E2E tests
 ```
@@ -59,25 +62,35 @@ npm run test:e2e          # Playwright E2E tests
 
 ```
 src/
-├── app/                      # Next.js App Router pages
-│   ├── (auth)/               # Route group for auth pages
-│   ├── api/                  # API routes (NextAuth, REST endpoints)
-│   ├── dashboard/            # Admin dashboard
-│   ├── portal/               # Client portal pages (separate auth context)
+├── app/                      # Next.js App Router pages and route handlers
+│   ├── admin/                # System/admin views (tenants, users, settings)
+│   ├── auth/                 # Sign-in, setup, invitation acceptance
+│   ├── api/                  # Route handlers for app APIs
+│   ├── dashboard/            # Staff/admin operational app
+│   ├── landing/              # Marketing/landing shell
+│   ├── portal/               # Client portal pages
 │   └── layout.tsx            # Root layout with theme provider
 ├── components/
 │   ├── ui/                   # shadcn/ui primitives (copied, not imported)
 │   ├── dashboard/            # Feature-specific components
 │   └── theme-provider.tsx    # Dark/light mode with next-themes
+├── jobs/                     # BullMQ worker and billing scheduler
 ├── lib/
-│   ├── auth.ts               # NextAuth config (authOptions)
-│   ├── timezone.ts           # Timezone conversion utilities
+│   ├── auth.ts               # NextAuth config, lockout, session shaping
+│   ├── audit.ts              # Audit logging helpers and action constants
+│   ├── billing.ts            # Rollover and overage calculations
+│   ├── email.ts              # Resend-backed transactional emails
+│   ├── rate-limit.ts         # Redis-backed rate limiting
+│   ├── storage.ts            # Azure Blob + local storage fallback
+│   ├── stripe.ts             # Stripe Checkout / Payment Intent / webhook helpers
+│   ├── timezone.ts           # Monthly + biweekly period utilities
 │   └── utils.ts              # cn() helper + misc utilities
 ├── db/
 │   └── index.ts              # Prisma Client singleton export
 ├── types/
 │   └── index.ts              # Shared TypeScript types
-└── integrations/             # QuickBooks/Xero/Stripe integration code
+├── integrations/             # QuickBooks/Xero OAuth helpers
+└── middleware.ts             # Edge middleware for subdomains, auth gates, security headers
 ```
 
 ---
@@ -346,7 +359,7 @@ Simplified, read-mostly interface:
   - Time Log: filterable table, external descriptions only
   - Invoices: status badges (Paid ✓, Due, Overdue !)
   - No editing capability — view and pay only
-  - Magic link or email/password auth (no complex onboarding)
+  - Invitation-based access + magic-link login for clients
 ```
 
 ---
@@ -356,15 +369,25 @@ Simplified, read-mostly interface:
 ### 4.1 Core Modules (MVP)
 
 ```
-├── Auth & User Management
-│   ├── Login / registration
-│   ├── Role-based access (Admin, Staff, Client)
-│   └── Session management
+├── Auth, Identity & Access
+│   ├── Tenant signup / bootstrap
+│   ├── Credentials login for staff/admin users
+│   ├── Client magic-link login
+│   ├── Invite-based team and client access
+│   ├── Role-based access (ADMIN, STAFF, CLIENT)
+│   ├── Session management + middleware enforcement
+│   └── Account lockout + login rate limiting
+│
+├── Tenant Operations
+│   ├── Tenant-scoped settings JSON + timezone
+│   ├── Onboarding progress / completion tracking
+│   ├── Admin tenant overview
+│   └── Future-ready multi-tenant expansion
 │
 ├── Client Management
 │   ├── Client profiles (company, contacts, billing info)
 │   ├── Client-specific settings
-│   └── Client portal access provisioning
+│   └── Client portal access provisioning via invitation
 │
 ├── Retainer Management
 │   ├── Retainer agreements (per-client)
@@ -372,6 +395,8 @@ Simplified, read-mostly interface:
 │   ├── Hour block allocation
 │   ├── Rate tiers (standard, overage tier 1, tier 2, etc.)
 │   ├── Rollover rules (cap, percentage limit, expiration)
+│   ├── Billing cycle selection (monthly or biweekly)
+│   ├── Travel time / travel expense configuration
 │   └── Retainer lifecycle (active, paused, expired, cancelled)
 │
 ├── Time Tracking
@@ -380,7 +405,9 @@ Simplified, read-mostly interface:
 │   ├── Configurable categories/tags
 │   ├── Internal notes (staff-only)
 │   ├── External descriptions (client-visible)
-│   └── Entry editing / approval workflow
+│   ├── Travel time flagging
+│   ├── Invoice linkage for billed work
+│   └── Period assignment by retainer billing cycle + timezone
 │
 ├── Expense Tracking
 │   ├── Expense entry (amount, date, category, description)
@@ -395,66 +422,79 @@ Simplified, read-mostly interface:
 │
 ├── Billing Engine
 │   ├── Monthly billing cycle automation (cron/scheduled job)
+│   ├── Biweekly period calculation + invoice support
 │   ├── Usage calculation (included hours, overage, tiered rates)
 │   ├── Rollover processing
-│   ├── Invoice generation or push to accounting software
-│   └── Overage billed-in-arrears logic
+│   ├── Travel time / deferred overage handling
+│   ├── Invoice generation, payment links, and payment recording
+│   └── Invoice generation or push to accounting software
 │
 ├── Client Portal
 │   ├── Retainer balance / usage dashboard
 │   ├── Time log viewer (with external notes only)
+│   ├── Expense visibility
 │   ├── Invoice history
 │   ├── PDF download (invoices, usage reports)
+│   ├── Self-service payment links
 │   └── Payment status visibility
 │
-└── Reporting & Analytics
-    ├── Utilization rates (per client, per period)
-    ├── Profitability per client
-    ├── Aging / outstanding invoices
-    ├── Rollover tracking
-    └── Forecasting (projected usage, revenue)
+├── Reporting & Analytics
+│   ├── Utilization rates (per client, per period)
+│   ├── Profitability per client
+│   ├── Aging / outstanding invoices
+│   ├── Rollover tracking
+│   └── Forecasting (projected usage, revenue)
+│
+└── Audit & Compliance
+    ├── Audit log persistence for auth and data mutations
+    ├── Admin audit-log retrieval API
+    ├── Security headers in middleware
+    └── Redis-backed rate limiting for sensitive operations
 ```
 
 ### 4.2 Integration Layer
 
 ```
-├── Accounting Integrations (pick one or many)
+├── Accounting Integrations
 │   ├── QuickBooks Online (OAuth2, REST API)
-│   ├── Xero (OAuth2, REST API)
-│   └── Odoo (XML-RPC / JSON-RPC API)
+│   └── Xero (OAuth2, REST API)
 │   
 │   Sync Strategy:
-│   ├── Clients → Customers (bidirectional)
-│   ├── Invoices → pushed from app to accounting
-│   ├── Payments → webhook sync back to app
-│   └── Chart of accounts mapping
+│   ├── OAuth connect + callback flow
+│   ├── Connection storage in IntegrationConnection
+│   ├── Future customer/invoice sync expansion
+│   └── Optional chart-of-accounts mapping via category GL fields
 │
 ├── Payment Processing (Stripe)
 │   ├── Customer creation & payment method storage
-│   ├── Invoice creation via Stripe Invoicing API
-│   ├── AutoPay (saved card / ACH)
+│   ├── Stripe Checkout Sessions
+│   ├── Payment Intents for embedded/custom flows
 │   ├── Payment links for manual pay
-│   └── Webhook handlers (payment success/failure)
+│   └── Webhook handlers (payment success/failure, checkout completion)
 │
-└── Future: CRM Integration (roadmap)
-    ├── HubSpot / Salesforce / ConnectWise
-    └── Contact sync, deal/opportunity mapping
+└── Email Delivery
+    ├── Resend transactional email delivery
+    ├── Welcome emails
+    ├── Team/client invitation emails
+    ├── Invoice/payment notifications
+    └── Retainer low-hours alerts
 ```
 
 #### Integration Points Details
 
 **Stripe**
 - **Customer Creation**: On first retainer/invoice for client
-- **Checkout/Payment Links**: Generate via Stripe Invoicing API
-- **Webhooks**: `/api/integrations/webhooks/stripe` handles payment success/failure
+- **Checkout/Payment Links**: Generate via Checkout Sessions and Payment Intents
+- **Webhooks**: `/api/stripe/webhook` handles payment success/failure and checkout completion
 
-**Accounting Software (QuickBooks/Xero/Odoo)**
+**Accounting Software (QuickBooks/Xero)**
 - **OAuth Flow**: Initiated via `/api/integrations/connect?provider=qbo`
-- **Sync Direction**: Clients → Customers (bidirectional), Invoices → push only (app to accounting)
-- **Connection Storage**: `IntegrationConnection` table with encrypted tokens
+- **Callback**: `/api/integrations/callback?provider=...`
+- **Connection Storage**: `IntegrationConnection` table with provider-specific config
+- **Current State**: OAuth connection is implemented; deep customer/invoice sync is still incremental
 
 **Email**
-Planned: Resend or Azure Communication Services (not yet implemented)
+Resend is implemented for welcome emails, magic links, invitations, invoice notices, payment notices, and retainer low-hour alerts.
 
 ---
 
@@ -485,19 +525,59 @@ const session = await getServerSession(authOptions)
 if (!session || session.user.role === "CLIENT") throw new Error("Forbidden")
 ```
 
+### Implemented Auth Flows
+
+```
+1. Tenant bootstrap
+   - Public setup flow creates a Tenant + initial ADMIN user
+
+2. Staff/Admin authentication
+   - NextAuth credentials provider
+   - JWT session enrichment with role, tenantId, timezone
+   - Login rate limiting and temporary lockout after repeated failures
+
+3. Team invitations
+   - ADMIN/STAFF can invite users into an existing tenant
+   - Invitation token is stored with expiry + acceptance metadata
+
+4. Client access
+   - Client invitation creates/grants CLIENT access
+   - Client portal supports passwordless magic-link login
+
+5. Edge enforcement
+   - Middleware rewrites admin/landing subdomain traffic
+   - Middleware blocks unauthorized dashboard, portal, admin, and protected API access
+   - Security headers applied globally at the edge
+```
+
 ---
 
 ## 5. Database Schema (Key Entities)
 
 ### Tenancy & Auth
 ```
-Tenant                    (future: multi-tenant support)
-  id, name, slug, settings, timezone (IANA), created_at
+Tenant
+  id, name, slug, settings, timezone (IANA)
+  onboarding_completed, onboarding_completed_at
+  created_at
 
 User
   id, tenant_id, email, name, role (ADMIN|STAFF|CLIENT)
   password_hash, avatar_url, timezone (IANA, nullable → falls back to tenant)
-  is_active, created_at
+  is_active, failed_login_attempts, locked_until, created_at
+
+VerificationToken
+  identifier, token, expires
+
+TenantInvitation
+  id, tenant_id, email, role
+  invited_by, invitation_token, expires_at
+  accepted_at, accepted_user_id, is_active, created_at
+
+ClientInvitation
+  id, tenant_id, client_id, email
+  invited_by, invitation_token, expires_at
+  accepted_at, accepted_user_id, is_active, created_at
 
 Session / Account         (NextAuth managed)
 ```
@@ -506,41 +586,50 @@ Session / Account         (NextAuth managed)
 ```
 Client
   id, tenant_id, company_name, primary_contact_name
-  email, phone, address, billing_email
+  email, phone
+  address_line_1, address_line_2, city, state, zip_code
+  billing_email
   timezone (IANA, nullable → falls back to tenant)
   stripe_customer_id, accounting_customer_id
   is_active, created_at
 
-  → has many: ClientContact, Retainer, Invoice
+  → has many: Retainer, Invoice, ClientInvitation
 
 RetainerTemplate
   id, tenant_id, name, description
   included_hours, rate_per_hour
+  overage_rate
   overage_tiers (JSON: [{from_hours, to_hours, rate}])
   rollover_enabled, rollover_cap_type (PERCENTAGE|FIXED)
   rollover_cap_value, rollover_expiry_months
+  travel_time_billing, travel_time_rate
+  travel_expenses_enabled, mileage_rate, per_diem_rate
   is_active, created_at
 
 Retainer
   id, tenant_id, client_id, template_id (nullable)
   name, status (ACTIVE|PAUSED|EXPIRED|CANCELLED)
   included_hours, rate_per_hour
+  overage_rate
   overage_tiers (JSON)
   rollover_enabled, rollover_cap_type, rollover_cap_value
   rollover_expiry_months
+  travel_time_billing, travel_time_rate
+  travel_expenses_enabled, mileage_rate, per_diem_rate
   timezone (IANA, inherited from tenant, overridable)
+  billing_cycle (MONTHLY|BIWEEKLY)
   billing_day, start_date, end_date (nullable)
   created_at
 
 RetainerPeriod
   id, retainer_id
   period_start, period_end
-  included_hours, rollover_hours_in, rollover_expiry_date
-  used_hours (computed/cached), overage_hours (computed)
+  included_hours, rollover_hours_in, rollover_hours_out, rollover_expiry_date
+  used_hours (computed/cached), overage_hours (computed/cached)
   status (OPEN|CLOSED|BILLED)
   created_at
 
-  → This is the monthly "bucket" that tracks allocation + usage
+  → This is the billing-period bucket that tracks allocation + usage for monthly or biweekly retainers
 ```
 
 ### Time Tracking
@@ -555,7 +644,9 @@ TimeEntry
   entry_timezone (IANA — the timezone the user was in when logging)
   external_description (client-visible)
   internal_notes (staff-only)
-  is_billable, status (DRAFT|SUBMITTED|APPROVED)
+  is_billable, is_travel_time
+  invoice_id (nullable — links entry to invoice when billed)
+  status (DRAFT|SUBMITTED|APPROVED)
   created_at, updated_at
 ```
 
@@ -624,6 +715,11 @@ SyncLog
   entity_type, entity_id, external_id
   status (SUCCESS|FAILED), error_message
   synced_at
+
+AuditLog
+  id, tenant_id, user_id (nullable), action
+  entity_type, entity_id, metadata
+  ip_address, user_agent, created_at
 ```
 
 ---
@@ -637,7 +733,7 @@ GOLDEN RULE:
   - Database: ALL timestamps stored as UTC (timestamptz in PostgreSQL)
   - Server: ALL logic runs against UTC
   - Client: ALL display converted to user's/client's local timezone
-  - Billing: Cycle boundaries calculated in the TENANT's timezone, then converted to UTC
+  - Billing: Cycle boundaries calculated in the RETAINER's timezone, then converted to UTC
 ```
 
 ### 6.2 Timezone Fields
@@ -663,7 +759,7 @@ Client
 Retainer
   + timezone       Inherited from tenant by default, overridable.
                    CRITICAL: This is the timezone used to determine
-                   period boundaries (when a "month" starts/ends).
+                   period boundaries for monthly and biweekly billing.
 ```
 
 ### 6.3 Where Timezone Matters Most
@@ -697,11 +793,16 @@ On stop:
 
 **Billing Cycle Boundaries**
 ```
-"Monthly billing on the 1st" means different things in different timezones.
+Both monthly and biweekly billing boundaries depend on the retainer timezone.
 
 For a retainer with timezone = "America/Denver" (UTC-7 / UTC-6 DST):
   March period = 2025-03-01T00:00:00 America/Denver → 2025-03-01T07:00:00Z
             to   2025-04-01T00:00:00 America/Denver → 2025-04-01T06:00:00Z (DST shift!)
+
+For a biweekly retainer:
+  - Period boundaries are derived from the retainer timezone
+  - The system can calculate Sunday-ending two-week periods
+  - Travel/overage can be deferred to a following invoice depending on billing configuration
 
 The billing cron job:
   1. Runs frequently (e.g., every 15 min) checking all retainers
@@ -726,7 +827,7 @@ Rollover expiry is date-based (not timestamp-based):
 ```typescript
 // Utility module: src/lib/timezone.ts
 
-import { zonedTimeToUtc, utcToZonedTime, format } from 'date-fns-tz';
+import { fromZonedTime, toZonedTime, formatInTimeZone } from 'date-fns-tz';
 
 // Convert a "wall clock" time in a timezone to UTC for storage
 function toUTC(localTime: Date, timezone: string): Date
@@ -748,6 +849,17 @@ function getPeriodForTimestamp(utcTimestamp: Date, retainerTimezone: string): {
 
 // Format a UTC date for display in a specific timezone
 function formatForDisplay(utcTime: Date, timezone: string, fmt: string): string
+
+// Calculate biweekly billing boundaries in a timezone
+function getBiweeklyPeriodBoundary(date: Date, timezone: string): {
+  startUtc: Date;
+  endUtc: Date;
+  localStart: Date;
+  localEnd: Date;
+}
+
+// Enumerate biweekly periods across a range
+function getBiweeklyPeriods(startDate: Date, endDate: Date, timezone: string): Array<...>
 ```
 
 ### 6.5 Database Configuration
@@ -767,10 +879,10 @@ SET timezone = 'UTC';
 
 ## 7. Key Business Logic
 
-### 7.1 Monthly Billing Cycle (Scheduled Job)
+### 7.1 Billing Cycle Engine (Monthly + Biweekly)
 
 ```
-On billing day (per retainer):
+For monthly retainers, on billing day (per retainer):
 1. Close current RetainerPeriod
    a. Calculate total used_hours from TimeEntries
    b. Calculate overage_hours (used - included - rollover_in)
@@ -778,8 +890,9 @@ On billing day (per retainer):
 
 2. Generate Invoice
    a. Line item: Monthly retainer fee (included_hours × rate)
-   b. Line item(s): Overage from PREVIOUS month (billed in arrears)
-   c. Push to Stripe and/or accounting software
+   b. Line item(s): Overage from current closed period
+   c. Add approved billable expenses not yet invoiced
+   d. Optionally push downstream to payment/accounting systems
 
 3. Process Rollover
    a. remaining = included_hours + rollover_in - used_hours
@@ -793,6 +906,12 @@ On billing day (per retainer):
    b. Status = OPEN
 
 5. Send invoice to client (email + portal notification)
+
+For biweekly retainers:
+1. Determine the correct two-week period using retainer timezone
+2. Link non-travel billable entries to the current invoice
+3. Defer travel time and configured overage charges to a follow-up invoice path
+4. Export period timesheets in CSV/HTML/Excel formats when needed
 ```
 
 ### 7.2 Rollover Logic
@@ -827,11 +946,17 @@ For 12 overage hours:
 
 #### Retainer Billing Cycle (Monthly Job)
 1. Close `RetainerPeriod` → calculate `used_hours` and `overage_hours` from `TimeEntry` sum
-2. Generate `Invoice` with line items: retainer fee + previous month's overage (billed in arrears)
+2. Generate `Invoice` with line items: retainer fee + overage + approved billable expenses
 3. Process rollover: `remaining = included_hours + rollover_in - used_hours`
    - Apply cap: `rollover_out = min(remaining, cap_percentage × included_hours)`
    - Set `rollover_expiry_date` (DATE field, evaluated in retainer timezone)
 4. Open new `RetainerPeriod` with `rollover_hours_in` from previous period
+
+#### Biweekly Billing Pattern
+- `billing_cycle = BIWEEKLY` changes how the period is derived and when invoices are created
+- Time entries can be linked directly to an in-progress invoice for the active biweekly period
+- `is_travel_time = true` entries can be held back for a separate follow-up invoice
+- Dedicated timesheet exports support billing review and client-facing period summaries
 
 #### Time Entry Display Rules
 - **Admin/Staff**: Show `external_description` + `internal_notes` (full detail)
@@ -927,12 +1052,12 @@ async function getDocumentDownloadUrl(documentId: string, session: Session) {
 
 - **Password Storage**: Use `bcrypt` with salt rounds ≥12 (see `src/lib/auth.ts`)
 - **Session Tokens**: JWT-based sessions with secure httpOnly cookies
-- **Account Lockout**: Implement after N failed login attempts (planned)
+- **Account Lockout**: Implemented with failed-attempt counters and temporary lockout windows
 - **MFA**: Azure AD B2C integration planned for SaaS phase
 
 ### Data Protection
 
-- **PII Encryption**: Sensitive fields (OAuth tokens) encrypted at rest in `IntegrationConnection`
+- **PII Encryption**: OAuth token fields are modeled in `IntegrationConnection`; encryption-at-rest should be enforced by implementation/deployment policy
 - **TLS**: All connections use HTTPS (Azure App Service enforces)
 - **Database**: PostgreSQL with encrypted connections (`sslmode=require`)
 - **Credentials**: Never log passwords, tokens, or API keys; use environment variables only
@@ -980,7 +1105,7 @@ await prisma.auditLog.create({
 - **Server-Side**: ALWAYS validate with Zod schemas before DB operations
 - **SQL Injection**: Prisma ORM provides parameterized queries (safe by default)
 - **XSS Prevention**: React escapes by default; use `dangerouslySetInnerHTML` only with sanitized HTML
-- **CSRF**: Next.js Server Actions include automatic CSRF protection
+- **CSRF**: Protect state-changing browser flows with same-site cookies and explicit verification where cross-origin submission is possible
 
 ### Data Retention & Privacy
 
@@ -991,14 +1116,12 @@ await prisma.auditLog.create({
 
 ### Rate Limiting
 
-Implement on API routes to prevent abuse:
+Implemented in Node.js route handlers using Redis-backed sliding windows:
 ```typescript
-// Middleware example (planned)
 const rateLimit = {
   timeEntries: 100, // per hour per tenant
   invoices: 50,
-  expenses: 50, // per hour per tenant
-  fileUploads: 20, // per hour per tenant
+  api: 200, // per hour per tenant
   login: 5 // per 15 minutes per IP
 }
 ```
@@ -1018,78 +1141,121 @@ const rateLimit = {
 
 ```
 /api
-├── /auth              (NextAuth routes)
-├── /clients
-│   ├── GET /              list clients
-│   ├── POST /             create client
-│   ├── GET /[id]          get client detail
-│   ├── PATCH /[id]        update client
-│   └── GET /[id]/retainers
+├── /auth
+│   ├── /[...nextauth]                 NextAuth route
+│   ├── /setup                         public tenant bootstrap
+│   ├── /tenants                       current-user tenant lookup
+│   ├── /magic-link                    client magic-link issue
+│   ├── /magic-link/verify             client magic-link verification
+│   ├── /invitations/[token]           team invite verification
+│   ├── /client-invitations/[token]    client invite verification
+│   └── /client-invitations/[token]/accept
 │
-├── /retainers
-│   ├── GET /              list retainers
-│   ├── POST /             create retainer
-│   ├── GET /[id]          get retainer + current period
-│   ├── PATCH /[id]        update retainer
-│   ├── GET /[id]/periods  list periods
-│   └── GET /[id]/periods/[periodId]
-│
-├── /templates
-│   ├── CRUD for retainer templates
-│
-├── /time-entries
-│   ├── GET /              list (filterable by client, retainer, date)
-│   ├── POST /             create entry
-│   ├── PATCH /[id]        update entry
-│   ├── DELETE /[id]       delete entry
-│   └── POST /timer        start/stop timer
-│
-├── /categories
-│   ├── CRUD for time categories
-│
-├── /expenses
-│   ├── GET /              list expenses (filterable by client, date, status)
-│   ├── POST /             create expense
-│   ├── PATCH /[id]        update expense
-│   ├── DELETE /[id]       delete expense
-│   ├── POST /[id]/documents  upload document
-│   ├── GET /[id]/documents   list documents
-│   ├── DELETE /[id]/documents/[docId]  delete document
-│   ├── GET /[id]/documents/[docId]/download  download document
-│   ├── POST /[id]/approve    approve expense
-│   └── POST /[id]/reject     reject expense
-│
-├── /expense-categories
-│   ├── CRUD for expense categories
-│
-├── /invoices
-│   ├── GET /              list invoices
-│   ├── GET /[id]          invoice detail
-│   ├── POST /[id]/send    send invoice
-│   └── GET /[id]/pdf      download PDF
+├── /audit-logs
+│   └── GET /                          admin audit log retrieval
 │
 ├── /billing
-│   ├── POST /run-cycle    trigger billing cycle (admin/cron)
-│   └── POST /rollover     trigger rollover processing
+│   ├── POST /cycle                    trigger billing cycle
+│   ├── POST /generate-invoice         generate invoice for a period
+│   ├── POST /init-period              initialize/open period
+│   └── GET  /check-low-hours          low-hours checks / alerts
+│
+├── /categories
+│   ├── GET /                          list time categories
+│   └── POST /                         create time category
+│
+├── /clients
+│   ├── GET /                          list clients
+│   ├── POST /                         create client
+│   ├── GET /[id]                      get client detail
+│   ├── PATCH /[id]                    update client
+│   └── POST /[clientId]/invite        invite client to portal
+│
+├── /expense-categories
+│   ├── GET /                          list expense categories
+│   ├── POST /                         create expense category
+│   ├── PATCH /[id]                    update expense category
+│   └── DELETE /[id]                   deactivate/delete expense category
+│
+├── /expenses
+│   ├── GET /                          list expenses
+│   ├── POST /                         create expense
+│   ├── PATCH /[id]                    update expense
+│   ├── DELETE /[id]                   delete expense
+│   ├── POST /[id]/submit              submit for approval
+│   ├── POST /[id]/approve             approve expense
+│   ├── POST /[id]/reject              reject expense
+│   ├── POST /[id]/reimburse           mark reimbursed
+│   ├── GET  /[id]/documents           list documents
+│   ├── POST /[id]/documents           upload document
+│   └── DELETE /[id]/documents/[documentId]
 │
 ├── /integrations
-│   ├── POST /connect      OAuth flow initiation
-│   ├── POST /disconnect
-│   ├── POST /sync         manual sync trigger
-│   └── POST /webhooks/[provider]  incoming webhooks
+│   ├── GET /                          list tenant integrations
+│   ├── GET /connect?provider=...      OAuth initiation
+│   ├── GET /callback?provider=...     OAuth callback
+│   └── DELETE /[id]                   disconnect integration
 │
-├── /portal               (client-facing, scoped by client auth)
-│   ├── GET /dashboard     retainer balance, usage summary
-│   ├── GET /time-entries  their time logs
-│   ├── GET /expenses      their expense logs (billable to them)
-│   ├── GET /invoices      their invoices
-│   └── GET /invoices/[id]/pdf
+├── /invitations
+│   └── POST /send                     send team invitation
 │
-└── /reports
-    ├── GET /utilization
-    ├── GET /profitability
-    ├── GET /aging
-    └── GET /forecast
+├── /invoices
+│   ├── GET /                          list invoices
+│   ├── GET /[id]                      invoice detail
+│   ├── POST /[id]/send                send invoice
+│   ├── GET /[id]/pdf                  invoice PDF/export
+│   ├── POST /[id]/payment-link        create Checkout Session or Payment Intent
+│   └── POST /[id]/pay                 manual payment record
+│
+├── /onboarding
+│   └── GET|POST /status               onboarding status / completion
+│
+├── /reports
+│   ├── GET /utilization
+│   ├── GET /profitability
+│   ├── GET /aging
+│   └── GET /forecast
+│
+├── /retainer-periods
+│   └── GET /                          list periods for a retainer
+│
+├── /retainers
+│   ├── GET /                          list retainers
+│   ├── POST /                         create retainer
+│   ├── GET /[id]                      get retainer + current state
+│   └── PATCH /[id]                    update retainer
+│
+├── /settings
+│   ├── GET /                          tenant settings
+│   └── PUT /                          update tenant settings
+│
+├── /stripe
+│   └── POST /webhook                  Stripe webhook receiver
+│
+├── /templates
+│   ├── GET /                          list retainer templates
+│   └── POST /                         create retainer template
+│
+├── /tenants
+│   └── GET /timezone                  tenant timezone helper
+│
+├── /time-entries
+│   ├── GET /                          list entries
+│   ├── POST /                         create standard entry
+│   ├── PATCH /[id]                    update entry
+│   ├── DELETE /[id]                   delete entry
+│   └── POST /timer                    timer entry endpoint
+│
+├── /time-entries-biweekly
+│   └── POST /create                   biweekly-aware time entry creation
+│
+├── /timesheet
+│   └── POST /export                   CSV / HTML / Excel export
+│
+└── /users
+    ├── GET /                          list users
+    ├── POST /                         create user
+    └── PATCH /[id]                    update user
 ```
 
 ---
@@ -1105,7 +1271,7 @@ const rateLimit = {
 │  │ Front Door   │───▶│ (Next.js container)    │  │
 │  └──────────────┘    │                        │  │
 │                      │ - SSR + API routes     │  │
-│                      │ - Server Actions       │  │
+│                      │ - Route handlers       │  │
 │                      └──────────┬─────────────┘  │
 │                                 │                 │
 │              ┌──────────────────┼──────────┐      │
@@ -1117,15 +1283,15 @@ const rateLimit = {
 │  └────────────────┘ └──────────────┘ └────────┘ │
 │                                                  │
 │  ┌──────────────────────────────────────────┐   │
-│  │ Azure Functions (optional, for workers)   │   │
-│  │ - Billing cycle cron                      │   │
-│  │ - Rollover expiry processing              │   │
-│  │ - Webhook processing                      │   │
+│  │ Standalone worker process (BullMQ)       │   │
+│  │ - Billing cycle cron / repeatable jobs   │   │
+│  │ - Period closing + rollover processing   │   │
+│  │ - Invoice generation jobs                │   │
 │  └──────────────────────────────────────────┘   │
 │                                                  │
 │  External:                                       │
 │  ├── Stripe API (payments, invoicing)            │
-│  ├── QBO / Xero / Odoo API (accounting sync)     │
+│  ├── QBO / Xero API (accounting OAuth + sync)    │
 │  └── Resend / Azure Comms (email)                │
 └─────────────────────────────────────────────────┘
 ```
@@ -1162,10 +1328,10 @@ Critical user flows in `tests/e2e/`:
 
 Built into the architecture from day one:
 
-- **tenant_id on every table** — even if there's only one tenant now, the column exists and queries are scoped. Migration to multi-tenant is seamless.
+- **tenant_id on every table** — queries, invites, onboarding, settings, reports, and billing are already tenant-scoped.
 - **Azure AD B2C** — swap in for auth when ready; supports custom signup flows, MFA, social login.
-- **Subdomain routing** — `acme.retainerapp.com` per tenant, handled via Next.js middleware.
-- **Stripe Connect** — each tenant connects their own Stripe account for payment processing.
+- **Subdomain routing** — admin and landing shells are already subdomain-aware via Next.js middleware; per-tenant domains can build on the same pattern.
+- **Stripe Connect** — future enhancement if each tenant should own its payment account.
 - **Feature flags** — tier-gate features (e.g., templates on Pro plan, integrations on Enterprise).
 - **Usage-based metering** — track API calls, active retainers, clients per tenant for billing.
 
@@ -1196,10 +1362,11 @@ Built into the architecture from day one:
 - ✅ Invoice list and PDF downloads
 - ✅ Billable expense visibility (view expenses billed to them)
 - ✅ Payment status (Stripe Checkout integration)
+- ✅ Client invitation acceptance flow
 
 ### Phase 4 — Accounting Integration (Weeks 9–11)
-- OAuth connection flow for QBO/Xero/Odoo
-- Customer sync (bidirectional)
+- ✅ OAuth connection flow for QBO/Xero
+- Customer sync (future expansion)
 - Invoice push (app → accounting software)
 - Payment webhook sync (accounting → app)
 
@@ -1209,12 +1376,21 @@ Built into the architecture from day one:
 - ✅ Forecasting
 - ✅ Email notifications (invoice sent, payment received, retainer low)
 - ✅ Timer function for time tracking
+- ✅ Audit logging foundation
+- ✅ Tenant onboarding flow
+
+### Phase 5.5 — Billing Expansion ✅ PARTIAL
+- ✅ Biweekly billing schema support
+- ✅ Biweekly period calculation helpers
+- ✅ Travel-time tracking and deferred invoicing path
+- ✅ Timesheet export endpoints
+- ⏳ Full worker automation for biweekly cycle parity with monthly billing
 
 ### Phase 6 — SaaS Prep (Future)
-- Multi-tenant isolation
-- Onboarding flow
+- Expanded tenant membership / cross-tenant access model
+- Tenant subscription billing (bill the tenant for using Ancora)
 - Subscription billing (Stripe for the app itself)
-- Admin super-dashboard
+- Richer admin super-dashboard and ops tooling
 
 ---
 

@@ -6,11 +6,15 @@ import { ThemeProvider } from "@/components/theme-provider"
 const inter = Inter({ 
   subsets: ["latin"],
   variable: '--font-inter',
+  display: 'swap',
+  preload: false,
 })
 
 const jetbrainsMono = JetBrains_Mono({ 
   subsets: ["latin"],
   variable: '--font-jetbrains-mono',
+  display: 'swap',
+  preload: false,
 })
 
 export const metadata: Metadata = {

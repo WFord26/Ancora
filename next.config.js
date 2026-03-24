@@ -7,7 +7,7 @@ const nextConfig = {
   },
   serverExternalPackages: ['xlsx'],
   images: {
-    domains: ['localhost'],
+    domains: ['localhost', 'vercel.app'],
   },
 }
 

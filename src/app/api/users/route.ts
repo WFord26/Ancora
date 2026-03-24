@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
+import { audit, AuditActions } from "@/lib/audit"
+import { getIp } from "@/lib/rate-limit"
 
 // GET /api/users - List all users
 export async function GET(request: NextRequest) {
@@ -102,8 +104,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash password
-    const passwordHash = await bcrypt.hash(validatedData.password, 10)
+    // Hash password with recommended 12 rounds
+    const passwordHash = await bcrypt.hash(validatedData.password, 12)
 
     const user = await prisma.user.create({
       data: {
@@ -123,6 +125,16 @@ export async function POST(request: NextRequest) {
         isActive: true,
         createdAt: true,
       },
+    })
+
+    await audit({
+      tenantId: session.user.tenantId,
+      userId: session.user.id,
+      action: AuditActions.USER_CREATED,
+      entityType: "User",
+      entityId: user.id,
+      metadata: { email: user.email, role: user.role },
+      ipAddress: getIp(request),
     })
 
     return NextResponse.json({

@@ -9,12 +9,56 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { AddressForm } from "@/components/address-form"
 
+// Common IANA timezones grouped by region
+const TIMEZONES = [
+  // Americas
+  { label: "America/Anchorage", group: "Americas" },
+  { label: "America/Chicago", group: "Americas" },
+  { label: "America/Denver", group: "Americas" },
+  { label: "America/Los_Angeles", group: "Americas" },
+  { label: "America/Mexico_City", group: "Americas" },
+  { label: "America/New_York", group: "Americas" },
+  { label: "America/Toronto", group: "Americas" },
+  { label: "America/Vancouver", group: "Americas" },
+  { label: "America/Argentina/Buenos_Aires", group: "Americas" },
+  { label: "America/Sao_Paulo", group: "Americas" },
+  // Europe
+  { label: "Europe/Amsterdam", group: "Europe" },
+  { label: "Europe/Berlin", group: "Europe" },
+  { label: "Europe/Brussels", group: "Europe" },
+  { label: "Europe/Dublin", group: "Europe" },
+  { label: "Europe/London", group: "Europe" },
+  { label: "Europe/Madrid", group: "Europe" },
+  { label: "Europe/Paris", group: "Europe" },
+  { label: "Europe/Rome", group: "Europe" },
+  { label: "Europe/Vienna", group: "Europe" },
+  { label: "Europe/Zurich", group: "Europe" },
+  // Asia
+  { label: "Asia/Bangkok", group: "Asia" },
+  { label: "Asia/Dubai", group: "Asia" },
+  { label: "Asia/Hong_Kong", group: "Asia" },
+  { label: "Asia/Kolkata", group: "Asia" },
+  { label: "Asia/Shanghai", group: "Asia" },
+  { label: "Asia/Singapore", group: "Asia" },
+  { label: "Asia/Tokyo", group: "Asia" },
+  // Pacific
+  { label: "Australia/Sydney", group: "Pacific" },
+  { label: "Australia/Melbourne", group: "Pacific" },
+  { label: "Pacific/Auckland", group: "Pacific" },
+  // Africa
+  { label: "Africa/Cairo", group: "Africa" },
+  { label: "Africa/Johannesburg", group: "Africa" },
+  { label: "Africa/Lagos", group: "Africa" },
+  { label: "UTC", group: "Other" },
+]
+
 export default function EditClientPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
   const [client, setClient] = useState<any>(null)
+  const [timezone, setTimezone] = useState("")
 
   useEffect(() => {
     fetch(`/api/clients/${params.id}`)
@@ -23,6 +67,7 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
         console.log('[Client Edit] API response:', data)
         if (data.success && data.data) {
           setClient(data.data)
+          setTimezone(data.data.timezone || "")
         } else {
           console.error('[Client Edit] API error:', data.error)
           setError(data.error || "Failed to load client")
@@ -53,7 +98,7 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
       state: formData.get("state") as string || null,
       zipCode: formData.get("zipCode") as string || null,
       billingEmail: formData.get("billingEmail") as string || null,
-      timezone: formData.get("timezone") as string || null,
+      timezone: timezone,
       isActive: formData.get("isActive") === "true",
     }
 
@@ -172,11 +217,19 @@ export default function EditClientPage({ params }: { params: { id: string } }) {
 
             <div className="space-y-2">
               <Label htmlFor="timezone">Timezone</Label>
-              <Input
+              <select
                 id="timezone"
-                name="timezone"
-                defaultValue={client.timezone || ""}
-              />
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="">Select a timezone</option>
+                {TIMEZONES.map((tz) => (
+                  <option key={tz.label} value={tz.label}>
+                    {tz.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">

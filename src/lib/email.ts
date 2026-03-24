@@ -286,3 +286,123 @@ export async function sendMagicLinkEmail(params: {
     text: `Sign in to the Ancora Client Portal: ${params.loginUrl} (expires in 15 minutes)`,
   })
 }
+
+/**
+ * Welcome email to new user after signup
+ */
+export async function sendWelcomeEmail(params: {
+  to: string
+  name: string
+  companyName: string
+  dashboardUrl?: string
+}) {
+  const appUrl = params.dashboardUrl || "https://app.ancora.app"
+  const html = baseTemplate(`
+    <div class="content">
+      <p>Welcome to Ancora, <strong>${params.name}</strong>! 🎉</p>
+      
+      <p>Thanks for signing up. We're excited to help you simplify retainer management and time tracking for <strong>${params.companyName}</strong>.</p>
+
+      <p>You're all set to start using Ancora. Here's what you can do:</p>
+      <ul style="color: #3f3f46; line-height: 1.8;">
+        <li>📊 Track time entries with categorization and notes</li>
+        <li>⏰ Manage client retainer hours and rollover policies</li>
+        <li>📄 Auto-generate invoices with overage charges</li>
+        <li>👥 Invite team members and create client portals</li>
+        <li>📈 View detailed reports and billing analytics</li>
+      </ul>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${appUrl}/dashboard" class="btn">Go to Dashboard</a>
+      </div>
+
+      <p style="color: #71717a; font-size: 14px;">If you have any questions or need help, reply to this email or visit our <a href="https://docs.ancora.app" style="color: #18181b; text-decoration: underline;">documentation</a>.</p>
+    </div>
+  `)
+
+  return sendEmail({
+    to: params.to,
+    subject: `Welcome to Ancora, ${params.name}!`,
+    html,
+    text: `Welcome to Ancora! Get started at ${appUrl}/dashboard`,
+  })
+}
+
+/**
+ * Team member invitation email
+ */
+export async function sendTeamInvitationEmail(params: {
+  to: string
+  invitedByName: string
+  tenantName: string
+  invitationUrl: string
+}) {
+  const html = baseTemplate(`
+    <div class="content">
+      <p>You've been invited to join <strong>${params.tenantName}</strong> on Ancora!</p>
+
+      <p><strong>${params.invitedByName}</strong> thinks you'd be a great addition to their team for managing retainer billing and time tracking.</p>
+
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 16px; margin: 16px 0;">
+        <p style="margin: 0; color: #1e40af;"><strong>Getting Started:</strong></p>
+        <p style="margin: 8px 0 0 0; color: #1e40af;">Click the button below to accept the invitation and create your account. You'll have full access to Ancora's features.</p>
+      </div>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${params.invitationUrl}" class="btn">Accept Invitation</a>
+      </div>
+
+      <p style="color: #71717a; font-size: 14px;">This invitation expires in 7 days. If you have questions, contact ${params.invitedByName} directly.</p>
+    </div>
+  `)
+
+  return sendEmail({
+    to: params.to,
+    subject: `You're invited to join ${params.tenantName} on Ancora`,
+    html,
+    text: `You've been invited to join ${params.tenantName} on Ancora: ${params.invitationUrl}`,
+  })
+}
+
+/**
+ * Client portal invitation email
+ */
+export async function sendClientInvitationEmail(params: {
+  to: string
+  clientName: string
+  tenantName: string
+  invitedByName: string
+  invitationUrl: string
+}) {
+  const html = baseTemplate(`
+    <div class="content">
+      <p>Hi <strong>${params.clientName}</strong>,</p>
+
+      <p><strong>${params.tenantName}</strong> has invited you to view your retainer information on Ancora.</p>
+
+      <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 16px; margin: 16px 0;">
+        <p style="margin: 0; color: #166534;"><strong>In your portal, you can:</strong></p>
+        <ul style="margin: 8px 0 0 0; color: #166534; padding-left: 20px;">
+          <li>View all your active retainers</li>
+          <li>Check included hours and usage</li>
+          <li>Download invoices</li>
+          <li>Monitor billing history</li>
+        </ul>
+      </div>
+
+      <div style="text-align: center; margin: 24px 0;">
+        <a href="${params.invitationUrl}" class="btn">Access Portal</a>
+      </div>
+
+      <p style="color: #71717a; font-size: 14px;">If you don't have an account yet, you'll be able to create one during the invitation acceptance process.</p>
+      <p style="color: #71717a; font-size: 14px;">If you have questions about your retainers or invoices, please contact <strong>${params.invitedByName}</strong>.</p>
+    </div>
+  `)
+
+  return sendEmail({
+    to: params.to,
+    subject: `${params.tenantName} invited you to view your retainers on Ancora`,
+    html,
+    text: `${params.tenantName} has invited you to view your retainer information: ${params.invitationUrl}`,
+  })
+}

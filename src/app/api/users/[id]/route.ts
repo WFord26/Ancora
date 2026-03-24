@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
 import bcrypt from "bcryptjs"
+import { audit, AuditActions } from "@/lib/audit"
+import { getIp } from "@/lib/rate-limit"
 
 // GET /api/users/[id] - Get user by ID
 export async function GET(
@@ -96,11 +98,17 @@ export async function PATCH(
 
     const updateData: any = { ...validatedData }
 
-    // Hash password if provided
+    // Hash password with recommended 12 rounds if provided
     if (validatedData.password) {
-      updateData.passwordHash = await bcrypt.hash(validatedData.password, 10)
+      updateData.passwordHash = await bcrypt.hash(validatedData.password, 12)
       delete updateData.password
     }
+
+    // Fetch previous values for audit diff (role and isActive changes)
+    const prevUser = await prisma.user.findFirst({
+      where: { id: params.id, tenantId: session.user.tenantId },
+      select: { role: true, isActive: true },
+    })
 
     const user = await prisma.user.update({
       where: {
@@ -118,6 +126,61 @@ export async function PATCH(
         createdAt: true,
       },
     })
+
+    const ip = getIp(request)
+
+    // Specific high-value events
+    if (validatedData.password) {
+      await audit({
+        tenantId: session.user.tenantId,
+        userId: session.user.id,
+        action: AuditActions.PASSWORD_CHANGED,
+        entityType: "User",
+        entityId: user.id,
+        ipAddress: ip,
+      })
+    }
+    if (prevUser && validatedData.role && validatedData.role !== prevUser.role) {
+      await audit({
+        tenantId: session.user.tenantId,
+        userId: session.user.id,
+        action: AuditActions.USER_ROLE_CHANGED,
+        entityType: "User",
+        entityId: user.id,
+        metadata: { from: prevUser.role, to: validatedData.role },
+        ipAddress: ip,
+      })
+    }
+    if (prevUser && validatedData.isActive === false && prevUser.isActive) {
+      await audit({
+        tenantId: session.user.tenantId,
+        userId: session.user.id,
+        action: AuditActions.USER_DEACTIVATED,
+        entityType: "User",
+        entityId: user.id,
+        ipAddress: ip,
+      })
+    } else if (prevUser && validatedData.isActive === true && !prevUser.isActive) {
+      await audit({
+        tenantId: session.user.tenantId,
+        userId: session.user.id,
+        action: AuditActions.USER_ACTIVATED,
+        entityType: "User",
+        entityId: user.id,
+        ipAddress: ip,
+      })
+    } else if (!validatedData.password && validatedData.role === prevUser?.role) {
+      // Generic update for other field changes
+      await audit({
+        tenantId: session.user.tenantId,
+        userId: session.user.id,
+        action: AuditActions.USER_UPDATED,
+        entityType: "User",
+        entityId: user.id,
+        metadata: { fields: Object.keys(validatedData) },
+        ipAddress: ip,
+      })
+    }
 
     return NextResponse.json({
       success: true,

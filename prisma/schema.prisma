@@ -20,6 +20,8 @@ model Tenant {
   slug      String   @unique
   settings  Json?
   timezone  String   @default("America/New_York") // IANA timezone
+  onboardingCompleted Boolean @default(false) @map("onboarding_completed")
+  onboardingCompletedAt DateTime? @map("onboarding_completed_at") @db.Timestamptz
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   users                  User[]
@@ -32,6 +34,9 @@ model Tenant {
   expenses               Expense[]
   invoices               Invoice[]
   integrationConnections IntegrationConnection[]
+  auditLogs              AuditLog[]
+  tenantInvitations      TenantInvitation[]
+  clientInvitations      ClientInvitation[]
 
   @@map("tenants")
 }
@@ -51,16 +56,23 @@ model User {
   passwordHash String?  @map("password_hash")
   avatarUrl    String?  @map("avatar_url")
   timezone     String? // IANA timezone, nullable → falls back to tenant
-  isActive     Boolean  @default(true) @map("is_active")
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  isActive            Boolean   @default(true) @map("is_active")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  timeEntries TimeEntry[]
-  expenses    Expense[]
-  approvedExpenses Expense[] @relation("ExpenseApprover")
-  expenseDocuments ExpenseDocument[]
-  accounts    Account[]
-  sessions    Session[]
+  tenant                      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timeEntries                 TimeEntry[]
+  expenses                    Expense[]
+  approvedExpenses            Expense[]   @relation("ExpenseApprover")
+  expenseDocuments            ExpenseDocument[]
+  accounts                    Account[]
+  sessions                    Session[]
+  auditLogs                   AuditLog[]
+  invitationsSentByUser       TenantInvitation[] @relation("TenantInvitationCreator")
+  invitationsAcceptedByUser   TenantInvitation[] @relation("TenantInvitationAcceptor")
+  clientInvitationsSentByUser ClientInvitation[] @relation("ClientInvitationCreator")
+  clientInvitationsAcceptedByUser ClientInvitation[] @relation("ClientInvitationAcceptor")
 
   @@index([tenantId])
   @@map("users")
@@ -106,6 +118,54 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
+model TenantInvitation {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  email            String
+  role             UserRole @default(STAFF)
+  invitedBy        String?  @map("invited_by") // User ID
+  invitationToken  String   @unique @map("invitation_token")
+  expiresAt        DateTime @map("expires_at") @db.Timestamptz
+  acceptedAt       DateTime? @map("accepted_at") @db.Timestamptz
+  acceptedUserId   String?  @map("accepted_user_id") // User ID of who accepted
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invitedByUser   User?  @relation("TenantInvitationCreator", fields: [invitedBy], references: [id], onDelete: SetNull)
+  acceptedByUser  User?  @relation("TenantInvitationAcceptor", fields: [acceptedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([tenantId, email], map: "tenantId_email")
+  @@index([tenantId])
+  @@index([invitationToken])
+  @@map("tenant_invitations")
+}
+
+model ClientInvitation {
+  id               String   @id @default(cuid())
+  tenantId         String   @map("tenant_id")
+  clientId         String   @map("client_id")
+  email            String
+  invitedBy        String?  @map("invited_by") // User ID
+  invitationToken  String   @unique @map("invitation_token")
+  expiresAt        DateTime @map("expires_at") @db.Timestamptz
+  acceptedAt       DateTime? @map("accepted_at") @db.Timestamptz
+  acceptedUserId   String?  @map("accepted_user_id") // User ID of who accepted
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant          Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  client          Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  invitedByUser   User?  @relation("ClientInvitationCreator", fields: [invitedBy], references: [id], onDelete: SetNull)
+  acceptedByUser  User?  @relation("ClientInvitationAcceptor", fields: [acceptedUserId], references: [id], onDelete: SetNull)
+
+  @@unique([clientId, email], map: "clientId_email")
+  @@index([tenantId])
+  @@index([clientId])
+  @@index([invitationToken])
+  @@map("client_invitations")
+}
+
 // ============================================
 // Client & Retainer
 // ============================================
@@ -134,6 +194,7 @@ model Client {
   timeEntries TimeEntry[]
   expenses    Expense[]
   invoices    Invoice[]
+  clientInvitations ClientInvitation[]
 
   @@unique([tenantId, companyName], map: "tenantId_companyName")
   @@index([tenantId])
@@ -565,4 +626,30 @@ model SyncLog {
   @@index([integrationId])
   @@index([entityType, entityId])
   @@map("sync_logs")
+}
+
+// ============================================
+// Audit Logging (SOC2)
+// ============================================
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String   @map("tenant_id")
+  userId     String?  @map("user_id") // null for pre-auth events (e.g. LOGIN_FAILED before user resolved)
+  action     String   // e.g. "LOGIN_SUCCESS", "USER_CREATED", "CLIENT_UPDATED"
+  entityType String?  @map("entity_type") // "User", "Client", "Retainer", "Invoice", ...
+  entityId   String?  @map("entity_id")
+  metadata   Json?    // diff, context, extra details
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?  @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([tenantId, action])
+  @@index([tenantId, entityType, entityId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }

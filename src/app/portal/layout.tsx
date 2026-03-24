@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
+import Image from "next/image"
 import { authOptions } from "@/lib/auth"
 
 export default async function PortalLayout({
@@ -24,7 +25,13 @@ export default async function PortalLayout({
       <header className="border-b">
         <div className="flex h-16 items-center px-4 md:px-6">
           <div className="flex items-center space-x-4">
-            <h1 className="text-xl font-bold">Ancora</h1>
+            <Image
+              src="/logo.svg"
+              alt="Ancora"
+              width={120}
+              height={40}
+              priority
+            />
             <span className="text-sm text-muted-foreground">Client Portal</span>
           </div>
 
@@ -64,6 +71,12 @@ export default async function PortalLayout({
               className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
             >
               Expenses
+            </a>
+            <a
+              href="/portal/time-entries"
+              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+            >
+              Time Log
             </a>
           </nav>
         </aside>
