@@ -102,12 +102,12 @@ export default function SignInPage() {
             </form>
 
             <div className="mt-6 text-center text-sm text-muted-foreground">
-              <p>Don't have an account?{" "}
+              <p>Need to bootstrap this instance?{" "}
                 <Link
-                  href="/landing"
+                  href="/auth/landing/setup"
                   className="font-medium text-foreground hover:underline"
                 >
-                  Go to landing page
+                  Run the installer
                 </Link>
               </p>
             </div>

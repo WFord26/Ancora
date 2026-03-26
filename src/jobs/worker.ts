@@ -16,7 +16,7 @@
  * This process runs independently of the Next.js server and handles:
  * - Scheduled billing cycle checks (every 15 minutes)
  * - Individual retainer billing cycles
- * - Invoice generation for closed periods
+ * - Invoice generation for closed periods, including biweekly deferred charges
  */
 
 import { startBillingWorker, stopBillingWorker, scheduleBillingCycleCheck } from "./billing-cycle"

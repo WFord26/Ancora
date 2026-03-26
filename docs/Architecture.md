@@ -519,7 +519,7 @@ session.user = {
 - **STAFF**: Time entry, client/retainer CRUD, reports
 - **CLIENT**: Portal access only (read-only view of their retainer + invoices)
 
-Check in Server Actions/API routes:
+Check in route handlers and server-side code:
 ```typescript
 const session = await getServerSession(authOptions)
 if (!session || session.user.role === "CLIENT") throw new Error("Forbidden")

@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { AlertCircle, Loader2, ArrowRight } from "lucide-react"
-import OnboardingLayout from "../layout"
+import OnboardingLayout from "@/components/onboarding/onboarding-layout"
 
 export default function RetainerSetupPage() {
   const router = useRouter()
@@ -24,6 +24,7 @@ export default function RetainerSetupPage() {
   const [loadingClients, setLoadingClients] = useState(true)
   const [skipRetainer, setSkipRetainer] = useState(false)
   const [selectedClient, setSelectedClient] = useState("")
+  const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "BIWEEKLY">("MONTHLY")
 
   useEffect(() => {
     fetch("/api/clients")
@@ -55,12 +56,15 @@ export default function RetainerSetupPage() {
       const data = {
         clientId: selectedClient,
         name: formData.get("name") as string,
+        billingCycle,
         includedHours: parseFloat(formData.get("includedHours") as string),
         ratePerHour: parseFloat(formData.get("ratePerHour") as string),
         overageRate: formData.get("overageRate")
           ? parseFloat(formData.get("overageRate") as string)
           : undefined,
-        billingDay: parseInt(formData.get("billingDay") as string) || 1,
+        billingDay: billingCycle === "BIWEEKLY"
+          ? 0
+          : (parseInt(formData.get("billingDay") as string) || 1),
         startDate: new Date().toISOString().split("T")[0],
         rolloverEnabled: formData.get("rolloverEnabled") === "true",
         rolloverCapType: formData.get("rolloverEnabled") === "true" ? "PERCENTAGE" : undefined,
@@ -89,6 +93,8 @@ export default function RetainerSetupPage() {
       setIsLoading(false)
     }
   }
+
+  const isBiweekly = billingCycle === "BIWEEKLY"
 
   return (
     <OnboardingLayout currentStep={3} totalSteps={5}>
@@ -161,9 +167,32 @@ export default function RetainerSetupPage() {
                     </p>
                   </div>
 
+                  <div>
+                    <Label htmlFor="billingCycle">Billing Cycle *</Label>
+                    <Select
+                      value={billingCycle}
+                      onValueChange={(value) => setBillingCycle(value as "MONTHLY" | "BIWEEKLY")}
+                    >
+                      <SelectTrigger id="billingCycle">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MONTHLY">Monthly</SelectItem>
+                        <SelectItem value="BIWEEKLY">Biweekly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isBiweekly
+                        ? "Biweekly retainers currently close every Sunday and span 14 days."
+                        : "Monthly retainers bill on the same day each month."}
+                    </p>
+                  </div>
+
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <Label htmlFor="includedHours">Included Hours/Month *</Label>
+                      <Label htmlFor="includedHours">
+                        {isBiweekly ? "Included Hours/Biweekly Period *" : "Included Hours/Month *"}
+                      </Label>
                       <Input
                         id="includedHours"
                         name="includedHours"
@@ -205,19 +234,34 @@ export default function RetainerSetupPage() {
                       <p className="text-xs text-muted-foreground mt-1">Optional</p>
                     </div>
 
-                    <div>
-                      <Label htmlFor="billingDay">Billing Day of Month</Label>
-                      <Input
-                        id="billingDay"
-                        name="billingDay"
-                        type="number"
-                        min="1"
-                        max="28"
-                        placeholder="1"
-                        defaultValue="1"
-                        disabled={isLoading}
-                      />
-                    </div>
+                    {isBiweekly ? (
+                      <div>
+                        <Label htmlFor="billingDayDisplay">Period End Day</Label>
+                        <Input
+                          id="billingDayDisplay"
+                          value="Sunday"
+                          disabled
+                          readOnly
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Biweekly billing is currently anchored to Sunday-to-Sunday periods.
+                        </p>
+                      </div>
+                    ) : (
+                      <div>
+                        <Label htmlFor="billingDay">Billing Day of Month</Label>
+                        <Input
+                          id="billingDay"
+                          name="billingDay"
+                          type="number"
+                          min="1"
+                          max="28"
+                          placeholder="1"
+                          defaultValue="1"
+                          disabled={isLoading}
+                        />
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -238,7 +282,7 @@ export default function RetainerSetupPage() {
 
                   <div className="rounded-lg bg-blue-500/10 border border-blue-500/20 p-4">
                     <p className="text-sm text-blue-200">
-                      <strong>💡 Quick math:</strong> {getMonthlyFee()} monthly fee for this retainer
+                      <strong>💡 Quick math:</strong> {getRetainerFee()} estimated fee per billing period
                     </p>
                   </div>
                 </>
@@ -289,7 +333,7 @@ export default function RetainerSetupPage() {
   )
 }
 
-function getMonthlyFee(): string {
+function getRetainerFee(): string {
   if (typeof window !== "undefined") {
     const hours = (document.querySelector('input[name="includedHours"]') as HTMLInputElement)?.value || "40"
     const rate = (document.querySelector('input[name="ratePerHour"]') as HTMLInputElement)?.value || "150"

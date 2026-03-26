@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select"
 import { AddressForm } from "@/components/address-form"
 import { AlertCircle, Loader2, Zap, ArrowRight } from "lucide-react"
-import OnboardingLayout from "../layout"
+import OnboardingLayout from "@/components/onboarding/onboarding-layout"
 
 const TIMEZONES = [
   { label: "America/Anchorage", group: "Americas" },

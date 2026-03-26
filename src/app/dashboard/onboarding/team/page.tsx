@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { AlertCircle, Loader2, ArrowRight, Trash2 } from "lucide-react"
-import OnboardingLayout from "../layout"
+import OnboardingLayout from "@/components/onboarding/onboarding-layout"
 
 interface TeamMember {
   email: string

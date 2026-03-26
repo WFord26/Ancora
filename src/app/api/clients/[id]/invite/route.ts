@@ -6,12 +6,12 @@ import { sendClientInvitationEmail } from "@/lib/email"
 import crypto from "crypto"
 
 /**
- * POST /api/clients/[clientId]/invite
+ * POST /api/clients/[id]/invite
  * Invite a client to view their retainer in the portal
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { clientId?: string } }
+  { params }: { params: { id?: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
@@ -31,7 +31,7 @@ export async function POST(
       )
     }
 
-    const clientId = params?.clientId
+    const clientId = params?.id
     if (!clientId) {
       return NextResponse.json(
         { error: "Client ID is required" },

@@ -11,7 +11,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { 
   collectTimesheetData,
   generateTimesheetCSV,
-  generateTimesheetHTML,
+  generateTimesheetExcel,
+  generateTimesheetPDF,
 } from "@/lib/timesheet-export"
 
 export async function POST(request: NextRequest) {
@@ -58,23 +59,13 @@ export async function POST(request: NextRequest) {
       contentType = "text/csv"
       filename = `timesheet-${timesheetData.clientName}-${timesheetData.periodStart}.csv`
     } else if (format === "pdf") {
-      content = generateTimesheetHTML(timesheetData)
-      contentType = "text/html"
-      filename = `timesheet-${timesheetData.clientName}-${timesheetData.periodStart}.html`
-      // In production, integrate with puppeteer for PDF generation
+      content = await generateTimesheetPDF(timesheetData)
+      contentType = "application/pdf"
+      filename = `timesheet-${timesheetData.clientName}-${timesheetData.periodStart}.pdf`
     } else {
-      // Excel format - requires xlsx package
-      try {
-        const { generateTimesheetExcel } = await import("@/lib/timesheet-export")
-        content = await generateTimesheetExcel(timesheetData)
-        contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        filename = `timesheet-${timesheetData.clientName}-${timesheetData.periodStart}.xlsx`
-      } catch (error) {
-        return NextResponse.json(
-          { error: "Excel generation not configured" },
-          { status: 500 }
-        )
-      }
+      content = await generateTimesheetExcel(timesheetData)
+      contentType = "application/vnd.ms-excel"
+      filename = `timesheet-${timesheetData.clientName}-${timesheetData.periodStart}.xls`
     }
 
     return new NextResponse(typeof content === "string" ? content : Buffer.from(content), {

@@ -1,9 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -13,28 +12,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { AddressForm } from "@/components/address-form"
 import { AlertCircle, Loader2 } from "lucide-react"
-import OnboardingLayout from "../layout"
-
-// Common IANA timezones
-const TIMEZONES = [
-  // Americas
-  { label: "America/Anchorage", group: "Americas" },
-  { label: "America/Chicago", group: "Americas" },
-  { label: "America/Denver", group: "Americas" },
-  { label: "America/Los_Angeles", group: "Americas" },
-  { label: "America/New_York", group: "Americas" },
-  { label: "America/Toronto", group: "Americas" },
-  { label: "America/Vancouver", group: "Americas" },
-  { label: "UTC", group: "Other" },
-]
+import OnboardingLayout from "@/components/onboarding/onboarding-layout"
+import { COMMON_TIMEZONES, DEFAULT_TIMEZONE } from "@/lib/timezone-options"
 
 export default function CompanySetupPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
-  const [timezone, setTimezone] = useState("America/Denver")
+  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE)
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const response = await fetch("/api/settings")
+        if (!response.ok) {
+          return
+        }
+
+        const data = await response.json()
+        if (data?.data?.timezone) {
+          setTimezone(data.data.timezone)
+        }
+      } catch (err) {
+        console.error("Failed to load tenant settings:", err)
+      }
+    }
+
+    loadSettings()
+  }, [])
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -42,7 +48,6 @@ export default function CompanySetupPage() {
     setIsLoading(true)
 
     try {
-      const formData = new FormData(e.currentTarget)
       const response = await fetch("/api/tenants/timezone", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -92,15 +97,11 @@ export default function CompanySetupPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="America/Denver">Denver - Mountain Time (America/Denver)</SelectItem>
-                  <SelectItem value="America/Chicago">Chicago - Central Time (America/Chicago)</SelectItem>
-                  <SelectItem value="America/New_York">New York - Eastern Time (America/New_York)</SelectItem>
-                  <SelectItem value="America/Los_Angeles">Los Angeles - Pacific Time (America/Los_Angeles)</SelectItem>
-                  <SelectItem value="Europe/London">London - GMT/BST (Europe/London)</SelectItem>
-                  <SelectItem value="Europe/Berlin">Berlin - CET/CEST (Europe/Berlin)</SelectItem>
-                  <SelectItem value="Asia/Tokyo">Tokyo - JST (Asia/Tokyo)</SelectItem>
-                  <SelectItem value="Australia/Sydney">Sydney - AEDT (Australia/Sydney)</SelectItem>
-                  <SelectItem value="UTC">UTC (Coordinated Universal Time)</SelectItem>
+                  {COMMON_TIMEZONES.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <p className="text-xs text-slate-400">

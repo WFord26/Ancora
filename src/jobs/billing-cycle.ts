@@ -1,12 +1,12 @@
 /**
  * Billing Cycle Queue & Worker
  * 
- * BullMQ job queue for automated monthly billing cycles.
+ * BullMQ job queue for automated monthly and biweekly billing cycles.
  * 
  * Jobs:
  * - billing:cycle-all    — Scans all active retainers and closes due periods
  * - billing:cycle-single — Runs billing cycle for a single retainer
- * - billing:generate-invoice — Generates invoice for a closed period
+ * - billing:generate-invoice — Generates invoice(s) for a closed period
  * 
  * The scheduler runs every 15 minutes checking for retainers whose current
  * period has ended (evaluated in each retainer's timezone). This avoids the
@@ -25,8 +25,8 @@ import {
   type RolloverConfig,
   type PeriodUsage,
 } from "@/lib/billing"
-import { generateInvoiceForPeriod } from "@/lib/invoice"
-import { addMonths } from "date-fns"
+import { generateInvoicesForClosedPeriod } from "@/lib/invoice"
+import { addDays, addMilliseconds, addMonths } from "date-fns"
 import { toZonedTime } from "date-fns-tz"
 
 // ============================================
@@ -151,6 +151,19 @@ async function handleCycleAll(_job: Job): Promise<{
       id: true,
       tenantId: true,
       name: true,
+      periods: {
+        where: {
+          status: "OPEN",
+          periodEnd: {
+            lte: now,
+          },
+        },
+        orderBy: { periodEnd: "asc" },
+        take: 1,
+        select: {
+          id: true,
+        },
+      },
     },
   })
 
@@ -162,6 +175,11 @@ async function handleCycleAll(_job: Job): Promise<{
   const queue = getBillingQueue()
   for (const retainer of retainersWithDuePeriods) {
     try {
+      const duePeriod = retainer.periods[0]
+      if (!duePeriod) {
+        continue
+      }
+
       await queue.add(
         "cycle-single",
         {
@@ -169,7 +187,7 @@ async function handleCycleAll(_job: Job): Promise<{
           tenantId: retainer.tenantId,
         },
         {
-          jobId: `cycle-${retainer.id}-${now.toISOString().slice(0, 7)}`, // Deduplicate per month
+          jobId: `cycle-${retainer.id}-${duePeriod.id}`,
         }
       )
       processed++
@@ -285,8 +303,14 @@ async function handleCycleSingle(
     })
 
     // Calculate next period boundaries
-    const nextPeriodStart = currentPeriod.periodEnd
-    const nextPeriodEnd = addMonths(nextPeriodStart, 1)
+    const nextPeriodStart =
+      retainer.billingCycle === "BIWEEKLY"
+        ? addMilliseconds(currentPeriod.periodEnd, 1)
+        : currentPeriod.periodEnd
+    const nextPeriodEnd =
+      retainer.billingCycle === "BIWEEKLY"
+        ? addDays(currentPeriod.periodEnd, 14)
+        : addMonths(nextPeriodStart, 1)
 
     // Open new period
     const newPeriod = await tx.retainerPeriod.create({
@@ -328,23 +352,37 @@ async function handleCycleSingle(
 }
 
 /**
- * Generate invoice for a closed retainer period.
+ * Generate invoice(s) for a closed retainer period.
  */
 async function handleGenerateInvoice(
   job: Job<{ retainerPeriodId: string; tenantId: string }>
-): Promise<{ invoiceId: string; invoiceNumber: string; total: number }> {
+): Promise<{
+  invoiceId: string
+  invoiceNumber: string
+  total: number
+  deferredInvoiceId: string | null
+}> {
   const { retainerPeriodId, tenantId } = job.data
 
-  const result = await generateInvoiceForPeriod(retainerPeriodId, tenantId)
+  const result = await generateInvoicesForClosedPeriod(retainerPeriodId, tenantId)
 
   console.log(
-    `Invoice ${result.invoice.invoiceNumber} generated: $${result.grandTotal.toFixed(2)}`
+    `Invoice ${result.primaryInvoice.invoice.invoiceNumber} generated: ` +
+      `$${result.primaryInvoice.grandTotal.toFixed(2)}`
   )
 
+  if (result.deferredInvoice) {
+    console.log(
+      `Deferred overage invoice ${result.deferredInvoice.invoice.invoiceNumber} generated: ` +
+        `$${result.deferredInvoice.grandTotal.toFixed(2)}`
+    )
+  }
+
   return {
-    invoiceId: result.invoice.id,
-    invoiceNumber: result.invoice.invoiceNumber,
-    total: result.grandTotal,
+    invoiceId: result.primaryInvoice.invoice.id,
+    invoiceNumber: result.primaryInvoice.invoice.invoiceNumber,
+    total: result.primaryInvoice.grandTotal,
+    deferredInvoiceId: result.deferredInvoice?.invoice.id ?? null,
   }
 }
 

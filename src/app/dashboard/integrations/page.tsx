@@ -18,6 +18,13 @@ type IntegrationConnection = {
   lastSyncAt: string | null
   createdAt: string
   tokenExpiry: string | null
+  config?: {
+    managedBy?: string
+    hasSecretKey?: boolean
+    hasPublishableKey?: boolean
+    hasWebhookSecret?: boolean
+    webhookUrl?: string
+  } | null
 }
 
 const INTEGRATION_META: Record<
@@ -42,7 +49,7 @@ const INTEGRATION_META: Record<
   STRIPE: {
     label: "Stripe",
     description: "Process payments and manage invoices via Stripe.",
-    connectProvider: null, // Managed via Stripe dashboard / env vars
+    connectProvider: null,
   },
 }
 
@@ -113,6 +120,10 @@ export default function IntegrationsPage() {
     return connections.find((c) => c.provider === provider) ?? null
   }
 
+  function isStripeConnection(conn: IntegrationConnection | null) {
+    return conn?.provider === "STRIPE"
+  }
+
   function statusBadge(status: IntegrationConnection["status"]) {
     if (status === "ACTIVE") return <Badge variant="default">Connected</Badge>
     if (status === "ERROR") return <Badge variant="destructive">Error</Badge>
@@ -179,10 +190,12 @@ export default function IntegrationsPage() {
               <CardContent className="space-y-3">
                 {conn && (
                   <div className="space-y-1 text-sm text-muted-foreground">
-                    <p>
-                      Connected:{" "}
-                      {new Date(conn.createdAt).toLocaleDateString()}
-                    </p>
+                    {!isStripeConnection(conn) && (
+                      <p>
+                        Connected:{" "}
+                        {new Date(conn.createdAt).toLocaleDateString()}
+                      </p>
+                    )}
                     {conn.lastSyncAt && (
                       <p>
                         Last sync:{" "}
@@ -192,11 +205,30 @@ export default function IntegrationsPage() {
                     {conn.tokenExpiry && new Date(conn.tokenExpiry) < new Date() && (
                       <p className="text-destructive">Access token expired — reconnect to resume syncing.</p>
                     )}
+                    {isStripeConnection(conn) && (
+                      <>
+                        <p>Managed via environment variables</p>
+                        <p>
+                          Secret key: {conn.config?.hasSecretKey ? "Present" : "Missing"}
+                        </p>
+                        <p>
+                          Publishable key: {conn.config?.hasPublishableKey ? "Present" : "Missing"}
+                        </p>
+                        <p>
+                          Webhook secret: {conn.config?.hasWebhookSecret ? "Present" : "Missing"}
+                        </p>
+                        {conn.config?.webhookUrl && (
+                          <p className="break-all">
+                            Webhook URL: <span className="font-mono text-xs">{conn.config.webhookUrl}</span>
+                          </p>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
 
                 <div className="flex gap-2">
-                  {conn ? (
+                  {conn && !isStripeConnection(conn) ? (
                     <>
                       {meta.connectProvider && (
                         <a href={`/api/integrations/connect?provider=${meta.connectProvider}`}>
@@ -214,6 +246,10 @@ export default function IntegrationsPage() {
                         {disconnecting === conn.id ? "Disconnecting…" : "Disconnect"}
                       </Button>
                     </>
+                  ) : conn && isStripeConnection(conn) ? (
+                    <Button size="sm" disabled>
+                      {conn.status === "ACTIVE" ? "Configured" : "Needs Environment Setup"}
+                    </Button>
                   ) : meta.connectProvider ? (
                     <a href={`/api/integrations/connect?provider=${meta.connectProvider}`}>
                       <Button size="sm">Connect</Button>
@@ -248,8 +284,9 @@ export default function IntegrationsPage() {
           <li>
             <strong>Stripe:</strong> Configured via{" "}
             <code className="rounded bg-muted px-1 text-xs">STRIPE_SECRET_KEY</code> and{" "}
-            <code className="rounded bg-muted px-1 text-xs">STRIPE_WEBHOOK_SECRET</code>. Use the Stripe
-            Dashboard to manage webhook endpoints.
+            <code className="rounded bg-muted px-1 text-xs">STRIPE_WEBHOOK_SECRET</code>. Optional client-side
+            work can also use <code className="rounded bg-muted px-1 text-xs">STRIPE_PUBLISHABLE_KEY</code>.
+            Point Stripe webhooks at <code className="rounded bg-muted px-1 text-xs">/api/stripe/webhook</code>.
           </li>
         </ul>
       </div>

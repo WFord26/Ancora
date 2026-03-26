@@ -203,8 +203,8 @@ export default function TimesheetExportButton({ retainers }: TimesheetExportButt
                 onChange={(e) => setSelectedFormat(e.target.value)}
               >
                 <option value="csv">CSV (Spreadsheet)</option>
-                <option value="excel">Excel (.xlsx)</option>
-                <option value="pdf">PDF / HTML</option>
+                <option value="excel">Excel (.xls)</option>
+                <option value="pdf">PDF</option>
               </select>
             </div>
 

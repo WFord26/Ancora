@@ -103,6 +103,20 @@ Add this to your `.env` file:
 NEXTAUTH_SECRET="generated-secret-here"
 ```
 
+## Production Bootstrap
+
+For a fresh production deployment, Ancora now uses a first-time installer instead of an
+always-open public signup flow.
+
+1. Deploy the app with an empty production database
+2. Start the application in production mode
+3. Visit `/auth/landing/setup`
+4. Create the first workspace, admin user, and billing timezone
+5. Sign in and finish the in-app onboarding wizard
+
+The installer disables itself automatically after the first successful bootstrap. For
+local development, continue using `npm run db:seed` or create records manually.
+
 ## Database Commands
 
 ```bash
@@ -263,7 +277,7 @@ Phase 2 will focus on billing core functionality:
 
 ## License
 
-[License information]
+This repository is currently licensed under Apache 2.0. See [LICENSE](./LICENSE).
 
 ---
 

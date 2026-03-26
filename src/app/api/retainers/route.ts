@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
-import { getPeriodBoundary } from "@/lib/timezone"
+import { getRetainerPeriodBoundary } from "@/lib/timezone"
 
 // GET /api/retainers - List all retainers
 export async function GET(request: NextRequest) {
@@ -94,8 +94,29 @@ const createRetainerSchema = z.object({
   mileageRate: z.number().positive().optional(),
   perDiemRate: z.number().positive().optional(),
   timezone: z.string().optional(),
-  billingDay: z.number().int().min(1).max(28).default(1),
+  billingCycle: z.enum(["MONTHLY", "BIWEEKLY"]).default("MONTHLY"),
+  billingDay: z.number().int().optional(),
   startDate: z.string(), // ISO date string
+}).superRefine((data, ctx) => {
+  if (data.billingCycle === "MONTHLY") {
+    const billingDay = data.billingDay ?? 1
+    if (billingDay < 1 || billingDay > 28) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["billingDay"],
+        message: "Monthly retainers require a billing day between 1 and 28",
+      })
+    }
+    return
+  }
+
+  if (data.billingDay !== undefined && data.billingDay !== 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["billingDay"],
+      message: "Biweekly retainers currently close on Sunday",
+    })
+  }
 })
 
 export async function POST(request: NextRequest) {
@@ -134,6 +155,10 @@ export async function POST(request: NextRequest) {
 
     const timezone = validatedData.timezone || tenant?.timezone || "America/New_York"
     const startDate = new Date(validatedData.startDate)
+    const billingDay =
+      validatedData.billingCycle === "BIWEEKLY"
+        ? 0
+        : (validatedData.billingDay ?? 1)
 
     // Create retainer
     const retainer = await prisma.retainer.create({
@@ -156,7 +181,8 @@ export async function POST(request: NextRequest) {
         mileageRate: validatedData.mileageRate,
         perDiemRate: validatedData.perDiemRate,
         timezone,
-        billingDay: validatedData.billingDay,
+        billingCycle: validatedData.billingCycle,
+        billingDay,
         startDate,
       },
       include: {
@@ -164,11 +190,13 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Create initial period
-    const now = new Date()
-    const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() + 1
-    const { startUtc, endUtc } = getPeriodBoundary(currentYear, currentMonth, timezone)
+    // Create the initial open period that contains the retainer start date.
+    const { startUtc, endUtc } = getRetainerPeriodBoundary(
+      startDate,
+      timezone,
+      validatedData.billingCycle,
+      billingDay
+    )
 
     await prisma.retainerPeriod.create({
       data: {

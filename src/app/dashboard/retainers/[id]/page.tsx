@@ -58,6 +58,8 @@ export default async function RetainerDetailPage({
   }
 
   const currentPeriod = retainer.periods.find((p) => p.status === "OPEN")
+  const isBiweekly = retainer.billingCycle === "BIWEEKLY"
+  const periodFee = Number(retainer.ratePerHour) * Number(retainer.includedHours)
 
   return (
     <div className="space-y-6">
@@ -112,18 +114,27 @@ export default async function RetainerDetailPage({
             </div>
 
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Monthly Cost</p>
-              <p className="mt-1 text-2xl font-bold">${(Number(retainer.ratePerHour) * Number(retainer.includedHours)).toFixed(2)}</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                {isBiweekly ? "Biweekly Cost" : "Monthly Cost"}
+              </p>
+              <p className="mt-1 text-2xl font-bold">${periodFee.toFixed(2)}</p>
             </div>
 
             <div>
               <p className="text-sm font-medium text-muted-foreground">Included Hours</p>
-              <p className="mt-1 text-lg">{Number(retainer.includedHours)} hours/month</p>
+              <p className="mt-1 text-lg">
+                {Number(retainer.includedHours)} {isBiweekly ? "hours/period" : "hours/month"}
+              </p>
             </div>
 
             <div>
               <p className="text-sm font-medium text-muted-foreground">Rate Per Hour</p>
               <p className="mt-1">${Number(retainer.ratePerHour).toFixed(2)}/hour</p>
+            </div>
+
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Billing Cycle</p>
+              <p className="mt-1">{isBiweekly ? "Biweekly" : "Monthly"}</p>
             </div>
 
             {retainer.overageRate && (
@@ -134,8 +145,12 @@ export default async function RetainerDetailPage({
             )}
 
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Billing Day</p>
-              <p className="mt-1">Day {retainer.billingDay} of month</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                {isBiweekly ? "Period End Day" : "Billing Day"}
+              </p>
+              <p className="mt-1">
+                {isBiweekly ? "Sunday" : `Day ${retainer.billingDay} of month`}
+              </p>
             </div>
 
             <div>

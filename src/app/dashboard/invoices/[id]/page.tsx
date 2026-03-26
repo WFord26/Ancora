@@ -14,6 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { StripePaymentActions } from "@/components/invoices/stripe-payment-actions"
+import { ManualPaymentForm } from "@/components/invoices/manual-payment-form"
+import { getStripeSetupStatus } from "@/lib/stripe"
 
 export default async function InvoiceDetailPage({
   params,
@@ -59,6 +62,12 @@ export default async function InvoiceDetailPage({
     0
   )
   const balance = Number(invoice.total) - totalPaid
+  const stripeSetup = getStripeSetupStatus()
+  const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000"
+  const showPaymentActions =
+    invoice.status !== "PAID" &&
+    invoice.status !== "VOID" &&
+    balance > 0
 
   return (
     <div className="space-y-6">
@@ -170,6 +179,37 @@ export default async function InvoiceDetailPage({
                 <p className="mt-1 text-lg font-bold text-destructive">
                   ${balance.toFixed(2)}
                 </p>
+              </div>
+            )}
+
+            {showPaymentActions && (
+              <div className="pt-2">
+                <p className="mb-2 text-sm font-medium text-muted-foreground">
+                  Payment Actions
+                </p>
+                <StripePaymentActions
+                  invoiceId={invoice.id}
+                  portalInvoiceUrl={`${baseUrl}/portal/invoices/${invoice.id}`}
+                  stripeReady={stripeSetup.isConfigured}
+                  disabled={invoice.status === "DRAFT"}
+                />
+                {invoice.status === "DRAFT" && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Send the invoice before collecting payment through Stripe.
+                  </p>
+                )}
+              </div>
+            )}
+
+            {showPaymentActions && (
+              <div className="pt-2">
+                <p className="mb-2 text-sm font-medium text-muted-foreground">
+                  Offline Payment
+                </p>
+                <ManualPaymentForm
+                  invoiceId={invoice.id}
+                  balanceDue={balance}
+                />
               </div>
             )}
           </CardContent>

@@ -32,6 +32,11 @@ export type InvoiceGenerationResult = {
   grandTotal: number
 }
 
+export type ClosedPeriodInvoiceResult = {
+  primaryInvoice: InvoiceGenerationResult
+  deferredInvoice: InvoiceGenerationResult | null
+}
+
 // ============================================
 // Invoice Number Generation
 // ============================================
@@ -357,6 +362,77 @@ export async function markInvoicePaid(
   })
 }
 
+export async function generateInvoicesForClosedPeriod(
+  retainerPeriodId: string,
+  tenantId: string,
+  options?: {
+    monthlyDueInDays?: number
+    biweeklyDueInDays?: number
+    deferredDueInDays?: number
+  }
+): Promise<ClosedPeriodInvoiceResult> {
+  const period = await prisma.retainerPeriod.findUnique({
+    where: { id: retainerPeriodId },
+    include: {
+      retainer: {
+        select: {
+          id: true,
+          tenantId: true,
+          billingCycle: true,
+        },
+      },
+    },
+  })
+
+  if (!period) {
+    throw new Error("Retainer period not found")
+  }
+
+  if (period.retainer.tenantId !== tenantId) {
+    throw new Error("Unauthorized")
+  }
+
+  if (period.retainer.billingCycle === "BIWEEKLY") {
+    const primaryInvoice = await generateBiweeklyInvoiceForPeriod(
+      retainerPeriodId,
+      tenantId,
+      options?.biweeklyDueInDays ?? 14
+    )
+
+    const previousBilledPeriod = await prisma.retainerPeriod.findFirst({
+      where: {
+        retainerId: period.retainer.id,
+        status: "BILLED",
+        periodStart: {
+          lt: period.periodStart,
+        },
+      },
+      orderBy: { periodStart: "desc" },
+    })
+
+    const deferredInvoice = previousBilledPeriod
+      ? await generateOverageInvoiceForPreviousPeriod(
+          previousBilledPeriod.id,
+          tenantId,
+          options?.deferredDueInDays ?? 30
+        )
+      : null
+
+    return { primaryInvoice, deferredInvoice }
+  }
+
+  const primaryInvoice = await generateInvoiceForPeriod(
+    retainerPeriodId,
+    tenantId,
+    options?.monthlyDueInDays ?? 30
+  )
+
+  return {
+    primaryInvoice,
+    deferredInvoice: null,
+  }
+}
+
 // ============================================
 // Biweekly Invoice Generation (NEW)
 // ============================================
@@ -574,6 +650,28 @@ export async function generateOverageInvoiceForPreviousPeriod(
     throw new Error("Unauthorized")
   }
 
+  const existingOverageInvoice = await prisma.invoice.findFirst({
+    where: {
+      tenantId,
+      retainerPeriodId: period.id,
+      lineItems: {
+        some: { lineType: "OVERAGE" },
+        none: {
+          lineType: {
+            in: ["RETAINER_FEE", "EXPENSE", "ROLLOVER_CREDIT", "ADJUSTMENT"],
+          },
+        },
+      },
+    },
+    include: {
+      lineItems: true,
+    },
+  })
+
+  if (existingOverageInvoice) {
+    return null
+  }
+
   const retainer = period.retainer
   const client = retainer.client
 
@@ -638,6 +736,7 @@ export async function generateOverageInvoiceForPreviousPeriod(
       data: {
         tenantId,
         clientId: client.id,
+        retainerPeriodId: period.id,
         invoiceNumber,
         status: "DRAFT",
         issuedDate: new Date(),

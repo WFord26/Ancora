@@ -9,12 +9,37 @@ import { sendPaymentReceivedNotification, sendAdminPaymentNotification } from "@
 
 let stripeInstance: Stripe | null = null
 
+export interface StripeSetupStatus {
+  hasSecretKey: boolean
+  hasPublishableKey: boolean
+  hasWebhookSecret: boolean
+  isConfigured: boolean
+}
+
+export function getStripeSetupStatus(): StripeSetupStatus {
+  const hasSecretKey = Boolean(process.env.STRIPE_SECRET_KEY)
+  const hasPublishableKey = Boolean(process.env.STRIPE_PUBLISHABLE_KEY)
+  const hasWebhookSecret = Boolean(process.env.STRIPE_WEBHOOK_SECRET)
+
+  return {
+    hasSecretKey,
+    hasPublishableKey,
+    hasWebhookSecret,
+    isConfigured: hasSecretKey && hasWebhookSecret,
+  }
+}
+
+export function assertStripeConfigured(): void {
+  const status = getStripeSetupStatus()
+  if (!status.hasSecretKey) {
+    throw new Error("Stripe is not configured: STRIPE_SECRET_KEY is missing")
+  }
+}
+
 export function getStripe(): Stripe {
   if (!stripeInstance) {
-    const key = process.env.STRIPE_SECRET_KEY
-    if (!key) {
-      throw new Error("STRIPE_SECRET_KEY environment variable is not set")
-    }
+    assertStripeConfigured()
+    const key = process.env.STRIPE_SECRET_KEY!
     stripeInstance = new Stripe(key, {
       apiVersion: "2023-10-16",
       typescript: true,
@@ -129,6 +154,7 @@ export interface CreateCheckoutOptions {
 export async function createCheckoutSession(
   options: CreateCheckoutOptions
 ): Promise<{ checkoutUrl: string; sessionId: string }> {
+  assertStripeConfigured()
   const { invoiceId, tenantId, successUrl, cancelUrl } = options
 
   const invoice = await prisma.invoice.findUnique({
@@ -149,6 +175,10 @@ export async function createCheckoutSession(
 
   if (invoice.status === "VOID") {
     throw new Error("Invoice is voided")
+  }
+
+  if (!["SENT", "OVERDUE"].includes(invoice.status)) {
+    throw new Error("Invoice must be sent before payment can be collected")
   }
 
   const stripe = getStripe()
@@ -233,6 +263,7 @@ export async function createPaymentIntent(
   invoiceId: string,
   tenantId: string
 ): Promise<{ clientSecret: string; paymentIntentId: string }> {
+  assertStripeConfigured()
   const invoice = await prisma.invoice.findUnique({
     where: { id: invoiceId, tenantId },
     include: { client: true },
@@ -244,6 +275,14 @@ export async function createPaymentIntent(
 
   if (invoice.status === "PAID") {
     throw new Error("Invoice is already paid")
+  }
+
+  if (invoice.status === "VOID") {
+    throw new Error("Invoice is voided")
+  }
+
+  if (!["SENT", "OVERDUE"].includes(invoice.status)) {
+    throw new Error("Invoice must be sent before payment can be collected")
   }
 
   const stripe = getStripe()
@@ -294,11 +333,12 @@ export function constructWebhookEvent(
   payload: string | Buffer,
   signature: string
 ): Stripe.Event {
-  const stripe = getStripe()
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET
-  if (!webhookSecret) {
+  const setup = getStripeSetupStatus()
+  if (!setup.hasWebhookSecret) {
     throw new Error("STRIPE_WEBHOOK_SECRET environment variable is not set")
   }
+  const stripe = getStripe()
+  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
   return stripe.webhooks.constructEvent(payload, signature, webhookSecret)
 }
 

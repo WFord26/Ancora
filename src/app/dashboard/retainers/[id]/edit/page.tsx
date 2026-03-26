@@ -8,12 +8,15 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
+type BillingCycle = "MONTHLY" | "BIWEEKLY"
+
 export default function EditRetainerPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState("")
   const [retainer, setRetainer] = useState<any>(null)
+  const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY")
 
   useEffect(() => {
     fetch(`/api/retainers/${params.id}`)
@@ -22,6 +25,7 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
         console.log('[Retainer Edit] API response:', data)
         if (data.success && data.data) {
           setRetainer(data.data)
+          setBillingCycle((data.data.billingCycle || "MONTHLY") as BillingCycle)
         } else {
           console.error('[Retainer Edit] API error:', data.error)
           setError(data.error || "Failed to load retainer")
@@ -43,12 +47,16 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
     const formData = new FormData(e.currentTarget)
     const data = {
       name: formData.get("name") as string,
+      billingCycle,
       includedHours: parseFloat(formData.get("includedHours") as string),
       ratePerHour: parseFloat(formData.get("ratePerHour") as string),
       overageRate: formData.get("overageRate") 
         ? parseFloat(formData.get("overageRate") as string)
         : undefined,
-      billingDay: parseInt(formData.get("billingDay") as string),
+      billingDay:
+        billingCycle === "BIWEEKLY"
+          ? 0
+          : parseInt(formData.get("billingDay") as string),
       rolloverEnabled: formData.get("rolloverEnabled") === "true",
       rolloverCapType: formData.get("rolloverEnabled") === "true" ? ("PERCENTAGE" as const) : undefined,
       rolloverCapValue: formData.get("rolloverEnabled") === "true"
@@ -111,6 +119,8 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
     )
   }
 
+  const isBiweekly = billingCycle === "BIWEEKLY"
+
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
@@ -148,9 +158,30 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="billingCycle">Billing Cycle *</Label>
+              <select
+                id="billingCycle"
+                name="billingCycle"
+                value={billingCycle}
+                onChange={(e) => setBillingCycle(e.target.value as BillingCycle)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="MONTHLY">Monthly</option>
+                <option value="BIWEEKLY">Biweekly</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {isBiweekly
+                  ? "Biweekly retainers currently close every Sunday and span 14 days."
+                  : "Monthly retainers bill on the same day each month."}
+              </p>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="includedHours">Included Hours/Month *</Label>
+                <Label htmlFor="includedHours">
+                  {isBiweekly ? "Included Hours/Biweekly Period *" : "Included Hours/Month *"}
+                </Label>
                 <Input
                   id="includedHours"
                   name="includedHours"
@@ -191,21 +222,36 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
               </p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="billingDay">Billing Day of Month *</Label>
-              <Input
-                id="billingDay"
-                name="billingDay"
-                type="number"
-                min="1"
-                max="28"
-                required
-                defaultValue={retainer.billingDay}
-              />
-              <p className="text-xs text-muted-foreground">
-                Day 1-28 (avoids month-end issues)
-              </p>
-            </div>
+            {isBiweekly ? (
+              <div className="space-y-2">
+                <Label htmlFor="billingDayDisplay">Period End Day</Label>
+                <Input
+                  id="billingDayDisplay"
+                  value="Sunday"
+                  disabled
+                  readOnly
+                />
+                <p className="text-xs text-muted-foreground">
+                  Biweekly billing is currently anchored to Sunday-to-Sunday periods.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="billingDay">Billing Day of Month *</Label>
+                <Input
+                  id="billingDay"
+                  name="billingDay"
+                  type="number"
+                  min="1"
+                  max="28"
+                  required
+                  defaultValue={retainer.billingCycle === "BIWEEKLY" ? 1 : retainer.billingDay}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Day 1-28 (avoids month-end issues)
+                </p>
+              </div>
+            )}
 
             <div className="space-y-4 rounded-lg border p-4">
               <div className="space-y-2">

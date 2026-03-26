@@ -26,16 +26,22 @@ export default function LandingPage() {
               </span>
             </h1>
             <p className="mt-6 text-lg text-muted-foreground">
-              Track time, manage retainer hours, handle rollovers, and generate invoices—all in one place. Built for IT consulting firms.
+              Track time, manage retainer hours, handle rollovers, and generate invoices
+              in one place. Self-host it today, then grow into a managed multi-tenant
+              deployment when you are ready.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" asChild>
-                <Link href="/auth/landing/setup">Start Free Trial</Link>
+                <Link href="/auth/landing/setup">Install Self-Hosted</Link>
               </Button>
               <Button size="lg" variant="outline" asChild>
-                <a href="#features">Learn More</a>
+                <Link href="/auth/landing/signin">Sign In</Link>
               </Button>
             </div>
+            <p className="mt-4 text-sm text-muted-foreground">
+              The production installer creates your first workspace and admin, then locks
+              itself automatically.
+            </p>
           </div>
         </div>
       </section>
@@ -102,62 +108,58 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Deployment Section */}
       <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Simple Pricing
+              Deployment Options
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              Scalable pricing that grows with your business
+              Start with the edition that matches how hands-on you want to be.
             </p>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3">
             {[
               {
-                name: "Starter",
-                price: "$99",
-                period: "per month",
-                description: "For small consulting teams",
+                name: "Self-Hosted Community",
+                price: "Free source access",
+                period: "single workspace",
+                description: "Run Ancora on your own infrastructure",
                 features: [
-                  "Up to 5 team members",
-                  "Unlimited clients",
-                  "Basic time tracking",
-                  "Email support",
-                  "Monthly invoicing",
+                  "Production first-time installer",
+                  "Single workspace bootstrap",
+                  "You manage hosting and upgrades",
+                  "No bundled support commitment",
+                  "Ideal for consultants who want control",
                 ],
               },
               {
-                name: "Professional",
-                price: "$299",
-                period: "per month",
-                description: "For growing agencies",
+                name: "Managed Cloud",
+                price: "Planned paid SaaS",
+                period: "multi-tenant",
+                description: "Ancora-hosted environment for teams that want less ops",
                 features: [
-                  "Up to 20 team members",
-                  "Unlimited clients",
-                  "Advanced time tracking",
-                  "Priority support",
-                  "Custom categories",
-                  "Client portal",
-                  "API access",
+                  "Managed infrastructure and updates",
+                  "Tenant isolation at the platform level",
+                  "Support and commercial add-ons",
+                  "Centralized billing and provisioning",
+                  "Best fit for agencies serving multiple teams",
                 ],
                 highlighted: true,
               },
               {
-                name: "Enterprise",
+                name: "Enterprise Services",
                 price: "Custom",
-                period: "contact us",
-                description: "For large organizations",
+                period: "implementation help",
+                description: "For migrations, rollout support, and tailored deployment work",
                 features: [
-                  "Unlimited team members",
-                  "Unlimited clients",
-                  "Advanced integrations",
-                  "Dedicated support",
-                  "Custom workflows",
-                  "SSO / SAML",
-                  "SLA guarantee",
+                  "Migration assistance",
+                  "Architecture and rollout guidance",
+                  "Commercial support agreements",
+                  "Priority roadmap collaboration",
+                  "Custom deployment planning",
                 ],
               },
             ].map((plan, idx) => (
@@ -189,8 +191,8 @@ export default function LandingPage() {
                     variant={plan.highlighted ? "default" : "outline"}
                     asChild
                   >
-                    <Link href="/auth/landing/setup">
-                      {plan.name === "Enterprise" ? "Contact Sales" : "Get Started"}
+                    <Link href={plan.name === "Self-Hosted Community" ? "/auth/landing/setup" : "/auth/landing/signin"}>
+                      {plan.name === "Self-Hosted Community" ? "Run Installer" : "Learn More"}
                     </Link>
                   </Button>
                 </CardContent>
@@ -207,11 +209,12 @@ export default function LandingPage() {
             Ready to simplify your billing?
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Start your free trial today. No credit card required.
+            Bootstrap a self-hosted workspace now and keep the path open for a managed
+            SaaS rollout later.
           </p>
           <div className="mt-8">
             <Button size="lg" asChild>
-              <Link href="/auth/landing/setup">Start Your Free Trial</Link>
+              <Link href="/auth/landing/setup">Install Ancora</Link>
             </Button>
           </div>
         </div>

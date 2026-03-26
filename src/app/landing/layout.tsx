@@ -30,7 +30,7 @@ export default function LandingLayout({
               Sign In
             </Link>
             <Button asChild>
-              <Link href="/auth/landing/setup">Get Started</Link>
+              <Link href="/auth/landing/setup">Install Self-Hosted</Link>
             </Button>
           </div>
         </div>

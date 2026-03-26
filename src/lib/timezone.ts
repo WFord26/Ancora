@@ -4,7 +4,7 @@
 import { fromZonedTime } from 'date-fns-tz/fromZonedTime'
 import { toZonedTime } from 'date-fns-tz/toZonedTime'
 import { formatInTimeZone } from 'date-fns-tz/formatInTimeZone'
-import { startOfMonth, endOfMonth, addMonths, addDays, subDays } from 'date-fns'
+import { startOfMonth, addMonths, addDays, subDays } from 'date-fns'
 
 /**
  * Convert a "wall clock" time in a timezone to UTC for storage
@@ -116,6 +116,43 @@ export function getBiweeklyPeriodBoundary(
   const startUtc = fromZonedTime(localStart, timezone)
   const endUtc = fromZonedTime(localEnd, timezone)
   
+  return { startUtc, endUtc, localStart, localEnd }
+}
+
+export function getRetainerPeriodBoundary(
+  date: Date,
+  timezone: string,
+  billingCycle: "MONTHLY" | "BIWEEKLY",
+  billingDay: number
+): {
+  startUtc: Date
+  endUtc: Date
+  localStart: Date
+  localEnd: Date
+} {
+  if (billingCycle === "BIWEEKLY") {
+    return getBiweeklyPeriodBoundary(date, timezone)
+  }
+
+  const localDate = toZonedTime(date, timezone)
+  const safeBillingDay = Math.min(Math.max(Math.trunc(billingDay), 1), 28)
+
+  let localStart = new Date(
+    localDate.getFullYear(),
+    localDate.getMonth(),
+    safeBillingDay
+  )
+
+  if (localDate.getDate() < safeBillingDay) {
+    localStart = addMonths(localStart, -1)
+  }
+
+  localStart.setHours(0, 0, 0, 0)
+
+  const localEnd = addMonths(localStart, 1)
+  const startUtc = fromZonedTime(localStart, timezone)
+  const endUtc = fromZonedTime(localEnd, timezone)
+
   return { startUtc, endUtc, localStart, localEnd }
 }
 

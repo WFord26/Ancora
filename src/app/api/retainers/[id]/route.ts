@@ -67,7 +67,8 @@ const updateRetainerSchema = z.object({
   travelExpensesEnabled: z.boolean().optional(),
   mileageRate: z.number().positive().optional(),
   perDiemRate: z.number().positive().optional(),
-  billingDay: z.number().int().min(1).max(28).optional(),
+  billingCycle: z.enum(["MONTHLY", "BIWEEKLY"]).optional(),
+  billingDay: z.number().int().optional(),
   endDate: z.string().optional(), // ISO date string
 })
 
@@ -87,11 +88,63 @@ export async function PATCH(
 
     const body = await request.json()
     const validatedData = updateRetainerSchema.parse(body)
+    const existingRetainer = await prisma.retainer.findFirst({
+      where: {
+        id: params.id,
+        tenantId: session.user.tenantId,
+      },
+    })
+
+    if (!existingRetainer) {
+      return NextResponse.json(
+        { success: false, error: "Retainer not found" },
+        { status: 404 }
+      )
+    }
+
+    const nextBillingCycle = validatedData.billingCycle ?? existingRetainer.billingCycle
+    let nextBillingDay = validatedData.billingDay ?? existingRetainer.billingDay
+
+    if (
+      nextBillingCycle === "MONTHLY" &&
+      existingRetainer.billingCycle === "BIWEEKLY" &&
+      validatedData.billingDay === undefined
+    ) {
+      nextBillingDay = 1
+    }
+
+    if (nextBillingCycle === "MONTHLY") {
+      if (nextBillingDay < 1 || nextBillingDay > 28) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Monthly retainers require a billing day between 1 and 28",
+          },
+          { status: 400 }
+        )
+      }
+    } else {
+      if (validatedData.billingDay !== undefined && validatedData.billingDay !== 0) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "Biweekly retainers currently close on Sunday",
+          },
+          { status: 400 }
+        )
+      }
+      nextBillingDay = 0
+    }
 
     const updateData: any = { ...validatedData }
     
     if (validatedData.endDate) {
       updateData.endDate = new Date(validatedData.endDate)
+    }
+
+    if (validatedData.billingCycle || validatedData.billingDay !== undefined) {
+      updateData.billingCycle = nextBillingCycle
+      updateData.billingDay = nextBillingDay
     }
 
     const retainer = await prisma.retainer.update({

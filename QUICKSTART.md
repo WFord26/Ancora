@@ -29,6 +29,10 @@ npm run db:seed
 npm run dev
 ```
 
+For production, do not use the public installer during development. Instead, seed local
+data with `npm run db:seed`. On a fresh production deployment, visit
+`/auth/landing/setup` once to create the first workspace and admin account.
+
 ## Installation (without Docker)
 
 If you have PostgreSQL installed locally:
@@ -56,6 +60,8 @@ npm run db:seed
 # 7. Start development server
 npm run dev
 ```
+
+The first-time installer is production-only and locks after the initial bootstrap.
 
 ## Default Test Accounts (after seeding)
 

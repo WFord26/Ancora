@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
+import { getOrCreateStripeCustomer, getStripeSetupStatus } from "@/lib/stripe"
 
 // GET /api/clients - List all clients
 export async function GET(request: NextRequest) {
@@ -95,6 +96,14 @@ export async function POST(request: NextRequest) {
         tenantId: session.user.tenantId,
       },
     })
+
+    if (getStripeSetupStatus().isConfigured) {
+      try {
+        await getOrCreateStripeCustomer(client.id, session.user.tenantId)
+      } catch (error) {
+        console.error("Failed to sync Stripe customer after client creation:", error)
+      }
+    }
 
     return NextResponse.json({
       success: true,

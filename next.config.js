@@ -4,8 +4,8 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
+    serverComponentsExternalPackages: ['xlsx'],
   },
-  serverExternalPackages: ['xlsx'],
   images: {
     domains: ['localhost', 'vercel.app'],
   },

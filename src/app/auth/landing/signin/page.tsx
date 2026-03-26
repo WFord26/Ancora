@@ -113,25 +113,27 @@ export default function LandingSignInPage() {
 
             <div className="mt-6 text-center text-sm">
               <p className="text-muted-foreground">
-                Don't have an account?{" "}
+                Need to bootstrap this instance?{" "}
                 <Link
                   href="/auth/landing/setup"
                   className="font-medium text-primary hover:underline"
                 >
-                  Get started
+                  Run the installer
                 </Link>
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <div className="rounded-lg border border-border/40 bg-muted/30 p-4 text-sm text-muted-foreground">
-          <p className="font-medium mb-2">Demo Credentials:</p>
-          <div className="space-y-1 font-mono text-xs">
-            <p>Admin: admin@example.com / admin123</p>
-            <p>Staff: staff@example.com / staff123</p>
+        {process.env.NODE_ENV !== "production" && (
+          <div className="rounded-lg border border-border/40 bg-muted/30 p-4 text-sm text-muted-foreground">
+            <p className="font-medium mb-2">Demo Credentials:</p>
+            <div className="space-y-1 font-mono text-xs">
+              <p>Admin: admin@example.com / admin123</p>
+              <p>Staff: staff@example.com / staff123</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

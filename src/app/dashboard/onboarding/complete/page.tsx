@@ -6,7 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, Zap, Users, BarChart3, Settings } from "lucide-react"
-import OnboardingLayout from "../layout"
+import OnboardingLayout from "@/components/onboarding/onboarding-layout"
 
 export default function OnboardingCompletePage() {
   const router = useRouter()

@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
-import { addMonths } from "date-fns"
-import { fromZonedTime } from "date-fns-tz"
+import { getRetainerPeriodBoundary } from "@/lib/timezone"
 
 /**
  * POST /api/billing/init-period
@@ -60,26 +59,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Calculate first period boundaries based on start date and billing day
-    const startDate = retainer.startDate
-    const billingDay = retainer.billingDay
-
-    // Create period start at billing day in retainer timezone
-    const year = startDate.getFullYear()
-    const month = startDate.getMonth()
-    
-    // If start date is before billing day, start this month; otherwise start next month
-    let periodStartLocal = new Date(year, month, billingDay)
-    if (startDate.getDate() > billingDay) {
-      periodStartLocal = addMonths(periodStartLocal, 1)
-    }
-
-    // Convert to UTC
-    const periodStart = fromZonedTime(periodStartLocal, retainer.timezone)
-    
-    // Period ends one month later
-    const periodEndLocal = addMonths(periodStartLocal, 1)
-    const periodEnd = fromZonedTime(periodEndLocal, retainer.timezone)
+    const { startUtc: periodStart, endUtc: periodEnd } = getRetainerPeriodBoundary(
+      retainer.startDate,
+      retainer.timezone,
+      retainer.billingCycle,
+      retainer.billingDay
+    )
 
     // Create first period
     const newPeriod = await prisma.retainerPeriod.create({

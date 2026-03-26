@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { generateInvoiceForPeriod } from "@/lib/invoice"
+import { generateInvoicesForClosedPeriod } from "@/lib/invoice"
 
 /**
  * POST /api/billing/generate-invoice
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { retainerPeriodId, dueInDays = 30 } = body
+    const { retainerPeriodId, dueInDays } = body
 
     if (!retainerPeriodId) {
       return NextResponse.json(
@@ -31,10 +31,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const result = await generateInvoiceForPeriod(
+    const result = await generateInvoicesForClosedPeriod(
       retainerPeriodId,
       session.user.tenantId,
-      dueInDays
+      dueInDays === undefined
+        ? undefined
+        : {
+            monthlyDueInDays: dueInDays,
+            biweeklyDueInDays: dueInDays,
+          }
     )
 
     return NextResponse.json({

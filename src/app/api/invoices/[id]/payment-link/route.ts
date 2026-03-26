@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
-import { createCheckoutSession, createPaymentIntent } from "@/lib/stripe"
+import { prisma } from "@/db"
+import {
+  createCheckoutSession,
+  createPaymentIntent,
+  getStripeSetupStatus,
+} from "@/lib/stripe"
 
 /**
  * POST /api/invoices/[id]/payment-link
@@ -35,6 +40,41 @@ export async function POST(
       successUrl,
       cancelUrl,
     } = body
+
+    const stripeSetup = getStripeSetupStatus()
+    if (!stripeSetup.isConfigured) {
+      return NextResponse.json(
+        { error: "Stripe is not configured for this deployment" },
+        { status: 503 }
+      )
+    }
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId, tenantId: session.user.tenantId },
+      select: {
+        id: true,
+        clientId: true,
+        status: true,
+      },
+    })
+
+    if (!invoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
+    }
+
+    if (session.user.role === "CLIENT") {
+      const client = await prisma.client.findFirst({
+        where: {
+          tenantId: session.user.tenantId,
+          email: session.user.email || undefined,
+        },
+        select: { id: true },
+      })
+
+      if (!client || client.id !== invoice.clientId) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+      }
+    }
 
     // Determine base URL for default success/cancel URLs
     const origin = request.headers.get("origin") || process.env.NEXTAUTH_URL || "http://localhost:3000"
@@ -77,6 +117,10 @@ export async function POST(
 
     const status = error.message?.includes("not found")
       ? 404
+      : error.message?.includes("not configured")
+        ? 503
+      : error.message?.includes("must be sent")
+        ? 400
       : error.message?.includes("already paid") || error.message?.includes("voided")
         ? 400
         : 500

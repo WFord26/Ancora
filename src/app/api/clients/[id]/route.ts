@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
+import { getStripeSetupStatus, syncStripeCustomer } from "@/lib/stripe"
 
 // GET /api/clients/[id] - Get client by ID
 export async function GET(
@@ -101,6 +102,14 @@ export async function PATCH(
       },
       data: validatedData,
     })
+
+    if (getStripeSetupStatus().isConfigured) {
+      try {
+        await syncStripeCustomer(client.id, session.user.tenantId)
+      } catch (error) {
+        console.error("Failed to sync Stripe customer after client update:", error)
+      }
+    }
 
     return NextResponse.json({
       success: true,

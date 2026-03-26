@@ -84,60 +84,111 @@ export function generateTimesheetCSV(data: TimesheetData): string {
 // ============================================
 
 /**
- * Export timesheet as Excel (.xlsx)
- * Note: Returns XLSX format data - requires 'xlsx' npm package
- * Install with: npm install xlsx
+ * Export timesheet as an Excel-readable workbook (.xls)
+ * Uses SpreadsheetML XML so it opens directly in Excel without extra packages.
  */
 export async function generateTimesheetExcel(data: TimesheetData): Promise<Buffer> {
-  let XLSX: any
-  try {
-    // xlsx must be installed separately: npm install xlsx
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    XLSX = require("xlsx")
-  } catch {
-    throw new Error("Excel export requires the 'xlsx' package. Run: npm install xlsx")
+  const rows: string[] = []
+
+  const addRow = (
+    cells: Array<{ value: string; type?: "String" | "Number"; styleId?: string }>
+  ) => {
+    rows.push(
+      `<Row>${cells
+        .map(({ value, type = "String", styleId }) => {
+          const style = styleId ? ` ss:StyleID="${styleId}"` : ""
+          const cellValue =
+            type === "Number" ? escapeXml(value) : escapeXml(value)
+          return `<Cell${style}><Data ss:Type="${type}">${cellValue}</Data></Cell>`
+        })
+        .join("")}</Row>`
+    )
   }
 
-  const workbook = XLSX.utils.book_new()
-  
-  // Create timesheet sheet
-  const timesheetData = [
-    [`Timesheet - ${data.clientName} / ${data.retainerName}`],
-    [`Period: ${data.periodStart} to ${data.periodEnd}`],
-    [`Generated: ${data.generatedDate}`],
-    [`Submission Deadline: ${data.submissionDeadline}`],
-    [],
-    ["SUMMARY"],
-    ["Total Hours", data.totalHours.toFixed(2)],
-    ["Retainer Hours", data.retainerHours.toFixed(2)],
-    ["Travel Hours", data.travelHours.toFixed(2)],
-    [],
-    ["TIME ENTRIES"],
-    [
-      "Date",
-      "Start Time",
-      "End Time",
-      "Duration",
-      "Description",
-      "Travel Time",
-      "Invoice #",
-    ],
-    ...data.entries.map((entry) => [
-      entry.date,
-      entry.startTime,
-      entry.endTime,
-      entry.duration,
-      entry.description,
-      entry.isTravelTime ? "Yes" : "No",
-      entry.invoiceNumber || "",
-    ]),
-  ]
-  
-  const worksheet = XLSX.utils.aoa_to_sheet(timesheetData)
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Timesheet")
-  
-  // Write to buffer
-  return XLSX.write(workbook, { bookType: "xlsx", type: "buffer" })
+  addRow([{ value: `Timesheet - ${data.clientName} / ${data.retainerName}`, styleId: "title" }])
+  addRow([{ value: `Period: ${data.periodStart} to ${data.periodEnd}` }])
+  addRow([{ value: `Generated: ${data.generatedDate}` }])
+  addRow([{ value: `Submission Deadline: ${data.submissionDeadline}` }])
+  addRow([{ value: "" }])
+  addRow([{ value: "SUMMARY", styleId: "section" }])
+  addRow([{ value: "Total Hours" }, { value: data.totalHours.toFixed(2), type: "Number" }])
+  addRow([{ value: "Retainer Hours" }, { value: data.retainerHours.toFixed(2), type: "Number" }])
+  addRow([{ value: "Travel Hours" }, { value: data.travelHours.toFixed(2), type: "Number" }])
+  addRow([{ value: "" }])
+  addRow([{ value: "TIME ENTRIES", styleId: "section" }])
+  addRow([
+    { value: "Date", styleId: "header" },
+    { value: "Start Time", styleId: "header" },
+    { value: "End Time", styleId: "header" },
+    { value: "Duration", styleId: "header" },
+    { value: "Description", styleId: "header" },
+    { value: "Travel Time", styleId: "header" },
+    { value: "Invoice #", styleId: "header" },
+  ])
+
+  for (const entry of data.entries) {
+    addRow([
+      { value: entry.date },
+      { value: entry.startTime },
+      { value: entry.endTime },
+      { value: entry.duration, type: "Number" },
+      { value: entry.description },
+      { value: entry.isTravelTime ? "Yes" : "No" },
+      { value: entry.invoiceNumber || "" },
+    ])
+  }
+
+  const workbook = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook
+  xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:o="urn:schemas-microsoft-com:office:office"
+  xmlns:x="urn:schemas-microsoft-com:office:excel"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:html="http://www.w3.org/TR/REC-html40">
+  <Styles>
+    <Style ss:ID="Default" ss:Name="Normal">
+      <Alignment ss:Vertical="Bottom"/>
+      <Font ss:FontName="Calibri" ss:Size="11"/>
+    </Style>
+    <Style ss:ID="title">
+      <Font ss:FontName="Calibri" ss:Size="14" ss:Bold="1"/>
+    </Style>
+    <Style ss:ID="section">
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/>
+      <Interior ss:Color="#E5E7EB" ss:Pattern="Solid"/>
+    </Style>
+    <Style ss:ID="header">
+      <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1"/>
+      <Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/>
+    </Style>
+  </Styles>
+  <Worksheet ss:Name="Timesheet">
+    <Table>
+      <Column ss:Width="75"/>
+      <Column ss:Width="70"/>
+      <Column ss:Width="70"/>
+      <Column ss:Width="65"/>
+      <Column ss:Width="320"/>
+      <Column ss:Width="80"/>
+      <Column ss:Width="90"/>
+      ${rows.join("")}
+    </Table>
+    <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">
+      <PageSetup>
+        <Layout x:Orientation="Landscape"/>
+      </PageSetup>
+      <Selected/>
+      <FreezePanes/>
+      <FrozenNoSplit/>
+      <SplitHorizontal>11</SplitHorizontal>
+      <TopRowBottomPane>11</TopRowBottomPane>
+      <ActivePane>2</ActivePane>
+    </WorksheetOptions>
+  </Worksheet>
+</Workbook>`
+
+  return Buffer.from(workbook, "utf8")
 }
 
 // ============================================
@@ -146,22 +197,42 @@ export async function generateTimesheetExcel(data: TimesheetData): Promise<Buffe
 
 /**
  * Export timesheet as PDF
- * Note: Uses your existing invoice-pdf lib pattern
+ * Uses a lightweight built-in PDF writer so the export works without external tooling.
  */
 export async function generateTimesheetPDF(data: TimesheetData): Promise<Buffer> {
-  // Use puppeteer or similar to generate PDF
-  // For now, placeholder that returns a simple HTML-to-PDF conversion
-  const html = generateTimesheetHTML(data)
-  
-  // You can integrate with puppeteer here:
-  // const browser = await puppeteer.launch()
-  // const page = await browser.newPage()
-  // await page.setContent(html)
-  // const pdf = await page.pdf()
-  // await browser.close()
-  // return pdf
-  
-  throw new Error("PDF generation requires puppeteer setup")
+  const lines: string[] = [
+    `Timesheet - ${data.clientName} / ${data.retainerName}`,
+    `Period: ${data.periodStart} to ${data.periodEnd}`,
+    `Submission Deadline: ${data.submissionDeadline}`,
+    `Generated: ${data.generatedDate}`,
+    "",
+    "SUMMARY",
+    `Total Hours: ${data.totalHours.toFixed(2)}`,
+    `Retainer Hours: ${data.retainerHours.toFixed(2)}`,
+    `Travel Hours: ${data.travelHours.toFixed(2)}`,
+    "",
+    "TIME ENTRIES",
+    "Date       Start  End    Hours  Travel  Invoice #    Description",
+    "--------------------------------------------------------------------------",
+  ]
+
+  for (const entry of data.entries) {
+    const prefix = [
+      entry.date.padEnd(10, " "),
+      entry.startTime.padEnd(6, " "),
+      entry.endTime.padEnd(6, " "),
+      entry.duration.padStart(5, " "),
+      (entry.isTravelTime ? "Yes" : "No").padEnd(7, " "),
+      (entry.invoiceNumber || "-").padEnd(12, " "),
+    ].join("  ")
+
+    const wrappedDescription = wrapTextForPdf(entry.description, 38)
+    wrappedDescription.forEach((segment, index) => {
+      lines.push(index === 0 ? `${prefix}${segment}` : `${" ".repeat(prefix.length)}${segment}`)
+    })
+  }
+
+  return buildSimplePdf(lines)
 }
 
 /**
@@ -173,13 +244,13 @@ export function generateTimesheetHTML(data: TimesheetData): string {
     .map(
       (entry) => `
     <tr>
-      <td>${entry.date}</td>
-      <td>${entry.startTime}</td>
-      <td>${entry.endTime}</td>
-      <td>${entry.duration}</td>
-      <td>${entry.description}</td>
+      <td>${escapeHtml(entry.date)}</td>
+      <td>${escapeHtml(entry.startTime)}</td>
+      <td>${escapeHtml(entry.endTime)}</td>
+      <td>${escapeHtml(entry.duration)}</td>
+      <td>${escapeHtml(entry.description)}</td>
       <td>${entry.isTravelTime ? "Yes" : ""}</td>
-      <td>${entry.invoiceNumber || ""}</td>
+      <td>${escapeHtml(entry.invoiceNumber || "")}</td>
     </tr>
   `
     )
@@ -192,38 +263,41 @@ export function generateTimesheetHTML(data: TimesheetData): string {
       <meta charset="UTF-8">
       <title>Timesheet</title>
       <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
+        @page { size: Letter landscape; margin: 24px; }
+        body { font-family: Arial, sans-serif; margin: 0; color: #111827; }
         h1 { font-size: 18px; margin-bottom: 10px; }
         .metadata { margin-bottom: 20px; font-size: 12px; }
-        .summary { margin: 20px 0; }
-        .summary-item { display: flex; justify-content: space-between; width: 300px; margin: 5px 0; }
+        .summary { margin: 20px 0; display: flex; gap: 24px; flex-wrap: wrap; }
+        .summary-item { min-width: 160px; }
+        .summary-label { display: block; color: #6b7280; font-size: 11px; }
+        .summary-value { font-size: 18px; font-weight: 700; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background-color: #f2f2f2; }
         tr:nth-child(even) { background-color: #f9f9f9; }
+        .mono { font-family: "Courier New", monospace; }
       </style>
     </head>
     <body>
-      <h1>Timesheet - ${data.clientName} / ${data.retainerName}</h1>
+      <h1>Timesheet - ${escapeHtml(data.clientName)} / ${escapeHtml(data.retainerName)}</h1>
       <div class="metadata">
-        <p>Period: ${data.periodStart} to ${data.periodEnd}</p>
-        <p>Submission Deadline: ${data.submissionDeadline}</p>
-        <p>Generated: ${data.generatedDate}</p>
+        <p>Period: ${escapeHtml(data.periodStart)} to ${escapeHtml(data.periodEnd)}</p>
+        <p>Submission Deadline: ${escapeHtml(data.submissionDeadline)}</p>
+        <p>Generated: ${escapeHtml(data.generatedDate)}</p>
       </div>
       
       <div class="summary">
-        <h2 style="font-size: 14px; margin-bottom: 10px;">SUMMARY</h2>
         <div class="summary-item">
-          <span>Total Hours:</span>
-          <strong>${data.totalHours.toFixed(2)}</strong>
+          <span class="summary-label">Total Hours</span>
+          <strong class="summary-value">${data.totalHours.toFixed(2)}</strong>
         </div>
         <div class="summary-item">
-          <span>Retainer Hours:</span>
-          <strong>${data.retainerHours.toFixed(2)}</strong>
+          <span class="summary-label">Retainer Hours</span>
+          <strong class="summary-value">${data.retainerHours.toFixed(2)}</strong>
         </div>
         <div class="summary-item">
-          <span>Travel Hours:</span>
-          <strong>${data.travelHours.toFixed(2)}</strong>
+          <span class="summary-label">Travel Hours</span>
+          <strong class="summary-value">${data.travelHours.toFixed(2)}</strong>
         </div>
       </div>
       
@@ -247,6 +321,140 @@ export function generateTimesheetHTML(data: TimesheetData): string {
     </body>
     </html>
   `
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+}
+
+function escapeXml(value: string): string {
+  return escapeHtml(value)
+}
+
+function wrapTextForPdf(text: string, maxLength: number): string[] {
+  const normalized = sanitizePdfText(text).replace(/\s+/g, " ").trim()
+  if (!normalized) return [""]
+
+  const words = normalized.split(" ")
+  const lines: string[] = []
+  let currentLine = ""
+
+  for (const word of words) {
+    const candidate = currentLine ? `${currentLine} ${word}` : word
+    if (candidate.length <= maxLength) {
+      currentLine = candidate
+      continue
+    }
+
+    if (currentLine) {
+      lines.push(currentLine)
+    }
+
+    if (word.length <= maxLength) {
+      currentLine = word
+      continue
+    }
+
+    let remaining = word
+    while (remaining.length > maxLength) {
+      lines.push(remaining.slice(0, maxLength))
+      remaining = remaining.slice(maxLength)
+    }
+    currentLine = remaining
+  }
+
+  if (currentLine) {
+    lines.push(currentLine)
+  }
+
+  return lines
+}
+
+function sanitizePdfText(value: string): string {
+  return value
+    .replace(/[^\x20-\x7E]/g, "?")
+    .replace(/\s+/g, " ")
+    .trim()
+}
+
+function escapePdfText(value: string): string {
+  return sanitizePdfText(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/\(/g, "\\(")
+    .replace(/\)/g, "\\)")
+}
+
+function buildSimplePdf(lines: string[]): Buffer {
+  const pageWidth = 612
+  const pageHeight = 792
+  const marginX = 40
+  const marginTop = 40
+  const fontSize = 10
+  const lineHeight = 13
+  const usableHeight = pageHeight - marginTop * 2
+  const linesPerPage = Math.max(1, Math.floor(usableHeight / lineHeight))
+  const pages: string[][] = []
+
+  for (let i = 0; i < lines.length; i += linesPerPage) {
+    pages.push(lines.slice(i, i + linesPerPage))
+  }
+
+  const objects: string[] = []
+  objects[1] = "<< /Type /Catalog /Pages 2 0 R >>"
+  objects[2] = ""
+  objects[3] = "<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>"
+
+  const pageRefs: string[] = []
+
+  for (const pageLines of pages) {
+    const pageObjectId = objects.length
+    const contentObjectId = pageObjectId + 1
+    const startY = pageHeight - marginTop - fontSize
+    const content = [
+      "BT",
+      `/F1 ${fontSize} Tf`,
+      `${lineHeight} TL`,
+      `${marginX} ${startY} Td`,
+      ...pageLines.map((line, index) =>
+        index === 0 ? `(${escapePdfText(line)}) Tj` : `T* (${escapePdfText(line)}) Tj`
+      ),
+      "ET",
+    ].join("\n")
+
+    objects[pageObjectId] =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${pageWidth} ${pageHeight}] ` +
+      `/Resources << /Font << /F1 3 0 R >> >> /Contents ${contentObjectId} 0 R >>`
+    objects[contentObjectId] =
+      `<< /Length ${Buffer.byteLength(content, "utf8")} >>\nstream\n${content}\nendstream`
+    pageRefs.push(`${pageObjectId} 0 R`)
+  }
+
+  objects[2] = `<< /Type /Pages /Kids [${pageRefs.join(" ")}] /Count ${pageRefs.length} >>`
+
+  let pdf = "%PDF-1.4\n%\xFF\xFF\xFF\xFF\n"
+  const offsets: number[] = [0]
+
+  for (let i = 1; i < objects.length; i++) {
+    offsets[i] = Buffer.byteLength(pdf, "utf8")
+    pdf += `${i} 0 obj\n${objects[i]}\nendobj\n`
+  }
+
+  const xrefOffset = Buffer.byteLength(pdf, "utf8")
+  pdf += `xref\n0 ${objects.length}\n`
+  pdf += "0000000000 65535 f \n"
+
+  for (let i = 1; i < objects.length; i++) {
+    pdf += `${offsets[i].toString().padStart(10, "0")} 00000 n \n`
+  }
+
+  pdf += `trailer\n<< /Size ${objects.length} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+
+  return Buffer.from(pdf, "utf8")
 }
 
 // ============================================

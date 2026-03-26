@@ -35,6 +35,29 @@ export async function POST(
     const body = await request.json()
     const { paidDate, paymentMethod, paymentReference } = body
 
+    const existingInvoice = await prisma.invoice.findUnique({
+      where: { id: invoiceId, tenantId: session.user.tenantId },
+      select: { id: true, total: true, status: true },
+    })
+
+    if (!existingInvoice) {
+      return NextResponse.json({ error: "Invoice not found" }, { status: 404 })
+    }
+
+    if (existingInvoice.status === "PAID") {
+      return NextResponse.json(
+        { error: "Invoice is already marked as paid" },
+        { status: 400 }
+      )
+    }
+
+    if (existingInvoice.status === "VOID") {
+      return NextResponse.json(
+        { error: "Voided invoices cannot be marked as paid" },
+        { status: 400 }
+      )
+    }
+
     // Mark invoice as paid
     await markInvoicePaid(
       invoiceId,
@@ -47,9 +70,9 @@ export async function POST(
       await prisma.payment.create({
         data: {
           invoiceId,
-          amount: (await prisma.invoice.findUnique({ where: { id: invoiceId }, select: { total: true } }))!.total,
-          paymentMethod: paymentMethod || null,
-          stripePaymentIntentId: paymentReference || null,
+          amount: existingInvoice.total,
+          paymentMethod: paymentMethod?.trim() || null,
+          stripePaymentIntentId: paymentReference?.trim() || null,
           status: "SUCCEEDED",
           paidAt: paidDate ? new Date(paidDate) : new Date(),
         },
@@ -74,9 +97,17 @@ export async function POST(
     })
   } catch (error: any) {
     console.error("Error marking invoice paid:", error)
+
+    const status = error.message?.includes("not found")
+      ? 404
+      : error.message?.includes("already marked as paid") ||
+        error.message?.includes("cannot be marked as paid")
+        ? 400
+        : 500
+
     return NextResponse.json(
       { error: error.message || "Failed to mark invoice as paid" },
-      { status: 500 }
+      { status }
     )
   }
 }
