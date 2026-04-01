@@ -6,6 +6,14 @@ import { toZonedTime } from 'date-fns-tz/toZonedTime'
 import { formatInTimeZone } from 'date-fns-tz/formatInTimeZone'
 import { startOfMonth, addMonths, addDays, subDays } from 'date-fns'
 
+function getDateOnlyUtcParts(date: Date) {
+  return {
+    year: date.getUTCFullYear(),
+    month: date.getUTCMonth(),
+    day: date.getUTCDate(),
+  }
+}
+
 /**
  * Convert a "wall clock" time in a timezone to UTC for storage
  */
@@ -119,6 +127,39 @@ export function getBiweeklyPeriodBoundary(
   return { startUtc, endUtc, localStart, localEnd }
 }
 
+function getBiweeklyPeriodBoundaryForDateOnly(
+  date: Date,
+  timezone: string
+): {
+  startUtc: Date
+  endUtc: Date
+  localStart: Date
+  localEnd: Date
+} {
+  const { year, month, day } = getDateOnlyUtcParts(date)
+  const localDate = new Date(year, month, day)
+
+  const dayOfWeek = localDate.getDay()
+  const daysToSubtract = dayOfWeek === 0 ? 0 : dayOfWeek
+
+  let localEnd = new Date(localDate)
+  if (daysToSubtract === 0) {
+    localEnd.setHours(23, 59, 59, 999)
+  } else {
+    localEnd = subDays(localEnd, daysToSubtract)
+    localEnd.setHours(23, 59, 59, 999)
+  }
+
+  let localStart = new Date(localEnd)
+  localStart = subDays(localStart, 13)
+  localStart.setHours(0, 0, 0, 0)
+
+  const startUtc = fromZonedTime(localStart, timezone)
+  const endUtc = fromZonedTime(localEnd, timezone)
+
+  return { startUtc, endUtc, localStart, localEnd }
+}
+
 export function getRetainerPeriodBoundary(
   date: Date,
   timezone: string,
@@ -131,19 +172,58 @@ export function getRetainerPeriodBoundary(
   localEnd: Date
 } {
   if (billingCycle === "BIWEEKLY") {
-    return getBiweeklyPeriodBoundary(date, timezone)
+    return getBiweeklyPeriodBoundaryForDateOnly(date, timezone)
   }
 
-  const localDate = toZonedTime(date, timezone)
+  // Retainer start dates are stored as calendar dates, not instants.
+  // Read them via UTC parts to preserve the intended YYYY-MM-DD value.
+  const { year, month, day } = getDateOnlyUtcParts(date)
   const safeBillingDay = Math.min(Math.max(Math.trunc(billingDay), 1), 28)
 
   let localStart = new Date(
-    localDate.getFullYear(),
-    localDate.getMonth(),
+    year,
+    month,
     safeBillingDay
   )
 
-  if (localDate.getDate() < safeBillingDay) {
+  if (day < safeBillingDay) {
+    localStart = addMonths(localStart, -1)
+  }
+
+  localStart.setHours(0, 0, 0, 0)
+
+  const localEnd = addMonths(localStart, 1)
+  const startUtc = fromZonedTime(localStart, timezone)
+  const endUtc = fromZonedTime(localEnd, timezone)
+
+  return { startUtc, endUtc, localStart, localEnd }
+}
+
+export function getPeriodBoundaryForTimestamp(
+  timestamp: Date,
+  timezone: string,
+  billingCycle: "MONTHLY" | "BIWEEKLY",
+  billingDay: number
+): {
+  startUtc: Date
+  endUtc: Date
+  localStart: Date
+  localEnd: Date
+} {
+  if (billingCycle === "BIWEEKLY") {
+    return getBiweeklyPeriodBoundary(timestamp, timezone)
+  }
+
+  const localTime = toZonedTime(timestamp, timezone)
+  const safeBillingDay = Math.min(Math.max(Math.trunc(billingDay), 1), 28)
+
+  let localStart = new Date(
+    localTime.getFullYear(),
+    localTime.getMonth(),
+    safeBillingDay
+  )
+
+  if (localTime.getDate() < safeBillingDay) {
     localStart = addMonths(localStart, -1)
   }
 

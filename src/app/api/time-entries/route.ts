@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
-import { toUTC, getPeriodForTimestamp } from "@/lib/timezone"
+import { toUTC, getPeriodBoundaryForTimestamp } from "@/lib/timezone"
 
 // GET /api/time-entries - List time entries
 export async function GET(request: NextRequest) {
@@ -145,12 +145,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Determine which period this entry belongs to
-    const { year, month } = getPeriodForTimestamp(startTimeUtc, retainer.timezone)
-    
-    // Find or create the period
-    const periodStart = new Date(year, month - 1, 1)
-    const periodEnd = new Date(year, month, 0)
+    const periodBoundary = getPeriodBoundaryForTimestamp(
+      startTimeUtc,
+      retainer.timezone,
+      retainer.billingCycle,
+      retainer.billingDay
+    )
     
     let period = await prisma.retainerPeriod.findFirst({
       where: {
@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
           lte: startTimeUtc,
         },
         periodEnd: {
-          gte: startTimeUtc,
+          gt: startTimeUtc,
         },
       },
     })
@@ -169,8 +169,8 @@ export async function POST(request: NextRequest) {
       period = await prisma.retainerPeriod.create({
         data: {
           retainerId: retainer.id,
-          periodStart: toUTC(periodStart, retainer.timezone),
-          periodEnd: toUTC(periodEnd, retainer.timezone),
+          periodStart: periodBoundary.startUtc,
+          periodEnd: periodBoundary.endUtc,
           includedHours: retainer.includedHours,
           rolloverHoursIn: 0,
           status: "OPEN",
