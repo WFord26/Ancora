@@ -5,7 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
-import { Menu, X } from "lucide-react"
+import { LogOut, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -160,6 +160,16 @@ export default function DashboardShell({
                       />
                     </>
                   )}
+
+                  <div className="my-3 border-t" />
+                  <Link
+                    href="/logout"
+                    onClick={() => setMobileNavOpen(false)}
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Log Out
+                  </Link>
                 </nav>
               </Dialog.Content>
             </Dialog.Portal>
@@ -182,6 +192,9 @@ export default function DashboardShell({
             <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
               {userRole}
             </span>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/logout">Log Out</Link>
+            </Button>
           </div>
         </div>
       </header>

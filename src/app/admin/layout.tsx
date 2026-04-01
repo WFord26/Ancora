@@ -41,7 +41,7 @@ export default async function AdminLayout({
               ADMIN
             </span>
             <Button variant="ghost" size="sm" asChild>
-              <a href="/auth/signout">Sign Out</a>
+              <Link href="/logout">Sign Out</Link>
             </Button>
           </div>
         </div>
