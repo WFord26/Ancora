@@ -176,23 +176,20 @@ export function getRetainerPeriodBoundary(
   }
 
   // Retainer start dates are stored as calendar dates, not instants.
-  // Read them via UTC parts to preserve the intended YYYY-MM-DD value.
+  // The initial open period should begin on the retainer start date and run
+  // through the next billing boundary rather than backfilling into the prior cycle.
   const { year, month, day } = getDateOnlyUtcParts(date)
   const safeBillingDay = Math.min(Math.max(Math.trunc(billingDay), 1), 28)
 
-  let localStart = new Date(
-    year,
-    month,
-    safeBillingDay
-  )
-
-  if (day < safeBillingDay) {
-    localStart = addMonths(localStart, -1)
-  }
-
+  const localStart = new Date(year, month, day)
   localStart.setHours(0, 0, 0, 0)
 
-  const localEnd = addMonths(localStart, 1)
+  let localEnd = new Date(year, month, safeBillingDay)
+  if (day >= safeBillingDay) {
+    localEnd = addMonths(localEnd, 1)
+  }
+  localEnd.setHours(0, 0, 0, 0)
+
   const startUtc = fromZonedTime(localStart, timezone)
   const endUtc = fromZonedTime(localEnd, timezone)
 

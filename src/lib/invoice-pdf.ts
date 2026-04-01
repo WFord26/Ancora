@@ -16,6 +16,7 @@
  */
 
 import prisma from "@/db"
+import { existsSync } from "fs"
 import { format } from "date-fns"
 import { decimalToNumber } from "./billing"
 
@@ -66,6 +67,21 @@ export type InvoicePdfData = {
   includedHours?: number
   usedHours?: number
   overageHours?: number
+}
+
+function getChromiumExecutablePath() {
+  const configuredPath = process.env.CHROMIUM_PATH
+  if (configuredPath && existsSync(configuredPath)) {
+    return configuredPath
+  }
+
+  const candidates = [
+    "/usr/bin/chromium-browser",
+    "/usr/bin/chromium",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  ]
+
+  return candidates.find((candidate) => existsSync(candidate))
 }
 
 // ============================================
@@ -522,6 +538,44 @@ export function renderInvoiceHtml(data: InvoicePdfData): string {
   </div>
 </body>
 </html>`
+}
+
+export async function renderInvoicePdf(data: InvoicePdfData): Promise<Buffer> {
+  const html = renderInvoiceHtml(data)
+  const { chromium } = await import("@playwright/test")
+  const executablePath = getChromiumExecutablePath()
+  const browser = await chromium.launch({
+    headless: true,
+    ...(executablePath ? { executablePath } : {}),
+    args: [
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--font-render-hinting=none",
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+    ],
+  })
+
+  try {
+    const page = await browser.newPage()
+    await page.setContent(html, { waitUntil: "networkidle" })
+
+    const pdf = await page.pdf({
+      format: "Letter",
+      margin: {
+        top: "0.5in",
+        right: "0.5in",
+        bottom: "0.5in",
+        left: "0.5in",
+      },
+      printBackground: true,
+      preferCSSPageSize: true,
+    })
+
+    return Buffer.from(pdf)
+  } finally {
+    await browser.close()
+  }
 }
 
 /**

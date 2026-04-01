@@ -3,8 +3,11 @@ FROM node:20-alpine AS base
 WORKDIR /app
 
 RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+ENV CHROMIUM_PATH=/usr/bin/chromium-browser
 
 FROM base AS deps
 

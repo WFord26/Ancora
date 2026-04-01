@@ -81,6 +81,13 @@ export default async function InvoiceDetailPage({
           </p>
         </div>
         <div className="flex gap-2">
+          <a
+            href={`/api/invoices/${invoice.id}/pdf?format=pdf`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Button variant="outline">Export PDF</Button>
+          </a>
           <Link href={`/dashboard/clients/${invoice.clientId}`}>
             <Button variant="outline">View Client</Button>
           </Link>

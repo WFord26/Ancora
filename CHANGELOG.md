@@ -6,17 +6,33 @@ The version numbering follows calendar versioning (YYYY.MM.DD).
 
 ## [Unreleased]
 
-### Added
+### Frontend
 
-### Changed
+#### Added
+- **Invoice Export**: Added an `Export PDF` action on the invoice detail screen so draft invoices can be downloaded as client-ready PDFs.
 
-### Fixed
+#### Changed
+- **Invoice Delivery Workflow**: Draft invoices can now be reviewed and exported directly from the dashboard before being sent to clients.
 
-### Deprecated
+#### Fixed
+- **Time Entry Forms**: Normalized optional `categoryId` and `internalNotes` values so blank fields no longer trigger `400` validation errors when creating or editing time entries.
+- **Time Entry Timezone Selection**: New time entries now use the selected retainer timezone instead of falling back to an unavailable client timezone field.
+- **Auth Build Stability**: Updated signin and invitation pages to read query parameters client-side without triggering Next.js prerender/export failures.
 
-### Removed
+### Backend
 
-### Security
+#### Added
+- **Invoice PDF Generation**: Extended `GET /api/invoices/[id]/pdf` to support `format=pdf` and generate downloadable PDF files from the existing invoice template.
+
+#### Changed
+- **Docker Runtime**: Added Chromium runtime dependencies to the production image so server-side invoice PDF generation works inside Docker deployments.
+- **Initial Retainer Periods**: Monthly retainers now open their first billing period on the configured `startDate` and end on the next billing boundary instead of backfilling into the previous cycle.
+
+#### Fixed
+- **Time Entry Validation**: Updated time entry create/edit schemas to accept omitted optional fields cleanly when the frontend sends blank values.
+- **Retainer Period Assignment**: Time entry period lookup and fallback period creation now respect the retainer billing cycle and billing day instead of defaulting to simple calendar-month boundaries.
+- **Date-Only Boundary Handling**: Corrected timezone handling for retainer start dates so date-only values do not shift into the prior period in western timezones.
+- **Dynamic Route Builds**: Marked authenticated/reporting API routes as dynamic to prevent static-export build errors during production builds.
 
 ---
 
@@ -453,4 +469,3 @@ This release introduces three major features:
 **Status**: ✅ Ready for Testing & Deployment  
 **Documentation**: ✅ Complete  
 **Code Quality**: ✅ Verified
-

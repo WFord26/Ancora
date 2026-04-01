@@ -2,15 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
-import { getInvoicePdfData, renderInvoiceHtml } from "@/lib/invoice-pdf"
+import { getInvoicePdfData, renderInvoiceHtml, renderInvoicePdf } from "@/lib/invoice-pdf"
 
 /**
  * GET /api/invoices/[id]/pdf
  * 
- * Generate and return invoice as HTML (for printing/PDF conversion)
+ * Generate and return invoice as HTML or PDF
  * 
  * Query params:
- * - format: "html" (default) or "json" (returns data only)
+ * - format: "html" (default), "pdf", or "json" (returns data only)
  * 
  * All roles can access (clients restricted to their own invoices)
  */
@@ -60,6 +60,19 @@ export async function GET(
 
     if (format === "json") {
       return NextResponse.json({ data: pdfData })
+    }
+
+    if (format === "pdf") {
+      const pdf = await renderInvoicePdf(pdfData)
+      const pdfBody = new Uint8Array(pdf)
+
+      return new NextResponse(pdfBody, {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Disposition": `attachment; filename="${pdfData.invoiceNumber}.pdf"`,
+          "Content-Length": String(pdf.length),
+        },
+      })
     }
 
     // Render HTML
