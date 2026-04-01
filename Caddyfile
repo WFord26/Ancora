@@ -1,7 +1,9 @@
-# Set CADDY_DOMAIN in .env to a public hostname such as app.example.com.
-# Public domains get automatic TLS; localhost uses Caddy's local certificate flow.
+# Set CADDY_DOMAIN in .env to the hostname you want Caddy to serve.
+# Mount your wildcard certificate directory into /certs and point these env vars at the files:
+# CADDY_TLS_CERT_FILE=/certs/fullchain.pem
+# CADDY_TLS_KEY_FILE=/certs/privkey.pem
 {$CADDY_DOMAIN:localhost} {
-  tls certs/fullchain.pem /certs/privkey.pem
+  tls {$CADDY_TLS_CERT_FILE:/certs/fullchain.pem} {$CADDY_TLS_KEY_FILE:/certs/privkey.pem}
   encode gzip zstd
   reverse_proxy frontend:3000
 }
