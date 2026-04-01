@@ -37,6 +37,98 @@ export type ClosedPeriodInvoiceResult = {
   deferredInvoice: InvoiceGenerationResult | null
 }
 
+type InvoiceDbClient = Prisma.TransactionClient | typeof prisma
+
+type InvoicePeriodLike = {
+  id: string
+  retainerId: string
+  periodStart: Date
+  periodEnd: Date
+  includedHours: Prisma.Decimal
+}
+
+function formatPeriodRange(period: Pick<InvoicePeriodLike, "periodStart" | "periodEnd">): string {
+  return `${format(new Date(period.periodStart), "MMM d, yyyy")} - ${format(
+    new Date(period.periodEnd),
+    "MMM d, yyyy"
+  )}`
+}
+
+function buildRetainerFeeDescription(
+  retainerName: string,
+  billingCycle: "MONTHLY" | "BIWEEKLY",
+  periodLabel: string,
+  includedHours: number,
+  ratePerHour: number
+): string {
+  const feeLabel =
+    billingCycle === "BIWEEKLY" ? "Retainer Fee" : "Monthly Retainer"
+
+  return `${retainerName} - ${feeLabel} for ${periodLabel} (${includedHours} hours @ $${ratePerHour}/hr)`
+}
+
+async function resolveInvoicePeriodForRetainerFee(
+  closedPeriod: InvoicePeriodLike & {
+    retainer: {
+      billingTiming: "PREPAID" | "POSTPAID"
+    }
+  }
+): Promise<InvoicePeriodLike> {
+  if (closedPeriod.retainer.billingTiming !== "PREPAID") {
+    return {
+      id: closedPeriod.id,
+      retainerId: closedPeriod.retainerId,
+      periodStart: closedPeriod.periodStart,
+      periodEnd: closedPeriod.periodEnd,
+      includedHours: closedPeriod.includedHours,
+    }
+  }
+
+  const nextOpenPeriod = await prisma.retainerPeriod.findFirst({
+    where: {
+      retainerId: closedPeriod.retainerId,
+      status: "OPEN",
+      periodStart: {
+        gte: closedPeriod.periodEnd,
+      },
+    },
+    orderBy: { periodStart: "asc" },
+  })
+
+  if (!nextOpenPeriod) {
+    throw new Error("No upcoming open period found for prepaid retainer")
+  }
+
+  return nextOpenPeriod
+}
+
+async function assertNoPrimaryInvoiceForPeriod(
+  db: InvoiceDbClient,
+  tenantId: string,
+  retainerPeriodId: string
+): Promise<void> {
+  const existingInvoice = await db.invoice.findFirst({
+    where: {
+      tenantId,
+      retainerPeriodId,
+      lineItems: {
+        some: {
+          lineType: "RETAINER_FEE",
+        },
+      },
+    },
+    select: {
+      invoiceNumber: true,
+    },
+  })
+
+  if (existingInvoice) {
+    throw new Error(
+      `A retainer fee invoice already exists for this period (${existingInvoice.invoiceNumber})`
+    )
+  }
+}
+
 // ============================================
 // Invoice Number Generation
 // ============================================
@@ -46,12 +138,15 @@ export type ClosedPeriodInvoiceResult = {
  * Format: INV-YYYY-{sequence}
  * Example: INV-2026-00001
  */
-export async function generateInvoiceNumber(tenantId: string): Promise<string> {
+export async function generateInvoiceNumber(
+  tenantId: string,
+  db: InvoiceDbClient = prisma
+): Promise<string> {
   const year = new Date().getFullYear()
   const prefix = `INV-${year}-`
 
   // Find highest invoice number for this year
-  const lastInvoice = await prisma.invoice.findFirst({
+  const lastInvoice = await db.invoice.findFirst({
     where: {
       tenantId,
       invoiceNumber: {
@@ -80,9 +175,9 @@ export async function generateInvoiceNumber(tenantId: string): Promise<string> {
  * Generate invoice for a closed retainer period
  * 
  * Creates:
- * - Retainer fee line item (monthly fee)
- * - Overage line items (if any, from PREVIOUS period - billed in arrears)
- * - Expense line items (billable expenses from this period)
+ * - Retainer fee line item for the billed service period
+ * - Overage line items (if any) from the closed usage period
+ * - Expense line items from the closed usage period
  * - Invoice record with totals
  * 
  * @param retainerPeriodId - ID of the CLOSED period
@@ -120,24 +215,33 @@ export async function generateInvoiceForPeriod(
 
   const retainer = period.retainer
   const client = retainer.client
+  const billedPeriod = await resolveInvoicePeriodForRetainerFee(period)
+  const billedPeriodLabel = formatPeriodRange(billedPeriod)
+  const closedPeriodLabel = formatPeriodRange(period)
 
   // Prepare line items
   const lineItems: InvoiceLineItemData[] = []
 
-  // 1. Monthly retainer fee
-  const includedHours = decimalToNumber(period.includedHours)
+  // 1. Retainer fee for the billed service period
+  const includedHours = decimalToNumber(billedPeriod.includedHours)
   const ratePerHour = decimalToNumber(retainer.ratePerHour)
   const retainerFee = includedHours * ratePerHour
 
   lineItems.push({
-    description: `${retainer.name} - Monthly Retainer (${includedHours} hours @ $${ratePerHour}/hr)`,
+    description: buildRetainerFeeDescription(
+      retainer.name,
+      retainer.billingCycle,
+      billedPeriodLabel,
+      includedHours,
+      ratePerHour
+    ),
     quantity: 1,
     unitPrice: retainerFee,
     total: retainerFee,
     lineType: "RETAINER_FEE",
   })
 
-  // 2. Overage charges (from CURRENT period)
+  // 2. Overage charges from the closed usage period
   const overageHours = decimalToNumber(period.overageHours)
   if (overageHours > 0) {
     // Calculate overage cost
@@ -150,7 +254,7 @@ export async function generateInvoiceForPeriod(
     const overageCost = overageHours * overageRate
 
     lineItems.push({
-      description: `Overage Hours (${overageHours.toFixed(2)} hours @ $${overageRate}/hr)`,
+      description: `Overage Hours for ${closedPeriodLabel} (${overageHours.toFixed(2)} hours @ $${overageRate}/hr)`,
       quantity: overageHours,
       unitPrice: overageRate,
       total: overageCost,
@@ -158,7 +262,7 @@ export async function generateInvoiceForPeriod(
     })
   }
 
-  // 3. Billable expenses from this period
+  // 3. Billable expenses from the closed usage period
   const expenses = await prisma.expense.findMany({
     where: {
       clientId: client.id,
@@ -178,7 +282,7 @@ export async function generateInvoiceForPeriod(
   for (const expense of expenses) {
     const amount = decimalToNumber(expense.amount)
     lineItems.push({
-      description: `Expense: ${expense.category.name} - ${expense.description}`,
+      description: `Expense for ${closedPeriodLabel}: ${expense.category.name} - ${expense.description}`,
       quantity: 1,
       unitPrice: amount,
       total: amount,
@@ -192,17 +296,17 @@ export async function generateInvoiceForPeriod(
   const tax = 0 // No tax for now
   const total = subtotal + tax
 
-  // Generate invoice number
-  const invoiceNumber = await generateInvoiceNumber(tenantId)
-
   // Create invoice with line items in a transaction
   const result = await prisma.$transaction(async (tx) => {
+    await assertNoPrimaryInvoiceForPeriod(tx, tenantId, billedPeriod.id)
+    const invoiceNumber = await generateInvoiceNumber(tenantId, tx)
+
     // Create invoice
     const invoice = await tx.invoice.create({
       data: {
         tenantId,
         clientId: client.id,
-        retainerPeriodId: period.id,
+        retainerPeriodId: billedPeriod.id,
         invoiceNumber,
         status: "DRAFT",
         issuedDate: new Date(),
@@ -247,6 +351,117 @@ export async function generateInvoiceForPeriod(
       where: { id: period.id },
       data: { status: "BILLED" },
     })
+
+    return { invoice, lineItems: createdLineItems }
+  })
+
+  return {
+    invoice: result.invoice,
+    lineItems,
+    totalBeforeTax: subtotal,
+    tax,
+    grandTotal: total,
+  }
+}
+
+/**
+ * Generate the initial prepaid invoice for an open retainer period.
+ *
+ * This is used when a newly created prepaid retainer should invoice the
+ * current service period immediately instead of waiting for the first cycle
+ * close.
+ */
+export async function generatePrepaidInvoiceForCurrentPeriod(
+  retainerPeriodId: string,
+  tenantId: string,
+  dueInDays?: number
+): Promise<InvoiceGenerationResult> {
+  const period = await prisma.retainerPeriod.findUnique({
+    where: { id: retainerPeriodId },
+    include: {
+      retainer: {
+        include: {
+          client: true,
+        },
+      },
+    },
+  })
+
+  if (!period) {
+    throw new Error("Retainer period not found")
+  }
+
+  if (period.retainer.tenantId !== tenantId) {
+    throw new Error("Unauthorized")
+  }
+
+  if (period.status !== "OPEN") {
+    throw new Error("Can only generate an initial prepaid invoice for an open period")
+  }
+
+  if (period.retainer.billingTiming !== "PREPAID") {
+    throw new Error("Retainer is not configured for prepaid billing")
+  }
+
+  const retainer = period.retainer
+  const client = retainer.client
+  const periodLabel = formatPeriodRange(period)
+  const includedHours = decimalToNumber(period.includedHours)
+  const ratePerHour = decimalToNumber(retainer.ratePerHour)
+  const retainerFee = includedHours * ratePerHour
+  const lineItems: InvoiceLineItemData[] = [
+    {
+      description: buildRetainerFeeDescription(
+        retainer.name,
+        retainer.billingCycle,
+        periodLabel,
+        includedHours,
+        ratePerHour
+      ),
+      quantity: 1,
+      unitPrice: retainerFee,
+      total: retainerFee,
+      lineType: "RETAINER_FEE",
+    },
+  ]
+  const subtotal = retainerFee
+  const tax = 0
+  const total = subtotal + tax
+  const defaultDueInDays = retainer.billingCycle === "BIWEEKLY" ? 14 : 30
+
+  const result = await prisma.$transaction(async (tx) => {
+    await assertNoPrimaryInvoiceForPeriod(tx, tenantId, period.id)
+    const invoiceNumber = await generateInvoiceNumber(tenantId, tx)
+
+    const invoice = await tx.invoice.create({
+      data: {
+        tenantId,
+        clientId: client.id,
+        retainerPeriodId: period.id,
+        invoiceNumber,
+        status: "DRAFT",
+        issuedDate: new Date(),
+        dueDate: addDays(new Date(), dueInDays ?? defaultDueInDays),
+        subtotal: numberToDecimal(subtotal),
+        tax: numberToDecimal(tax),
+        total: numberToDecimal(total),
+      },
+    })
+
+    const createdLineItems = await Promise.all(
+      lineItems.map((item) =>
+        tx.invoiceLineItem.create({
+          data: {
+            invoiceId: invoice.id,
+            description: item.description,
+            quantity: numberToDecimal(item.quantity),
+            unitPrice: numberToDecimal(item.unitPrice),
+            total: numberToDecimal(item.total),
+            lineType: item.lineType,
+          },
+        })
+      )
+    )
 
     return { invoice, lineItems: createdLineItems }
   })
@@ -479,17 +694,26 @@ export async function generateBiweeklyInvoiceForPeriod(
 
   const retainer = period.retainer
   const client = retainer.client
+  const billedPeriod = await resolveInvoicePeriodForRetainerFee(period)
+  const billedPeriodLabel = formatPeriodRange(billedPeriod)
+  const closedPeriodLabel = formatPeriodRange(period)
 
   // Prepare line items
   const lineItems: InvoiceLineItemData[] = []
 
-  // 1. Retainer fee (based on included hours for this period)
-  const includedHours = decimalToNumber(period.includedHours)
+  // 1. Retainer fee for the billed service period
+  const includedHours = decimalToNumber(billedPeriod.includedHours)
   const ratePerHour = decimalToNumber(retainer.ratePerHour)
   const retainerFee = includedHours * ratePerHour
 
   lineItems.push({
-    description: `${retainer.name} - Retainer Fee (${includedHours} hours @ $${ratePerHour}/hr)`,
+    description: buildRetainerFeeDescription(
+      retainer.name,
+      retainer.billingCycle,
+      billedPeriodLabel,
+      includedHours,
+      ratePerHour
+    ),
     quantity: 1,
     unitPrice: retainerFee,
     total: retainerFee,
@@ -522,7 +746,7 @@ export async function generateBiweeklyInvoiceForPeriod(
   for (const expense of expenses) {
     const amount = decimalToNumber(expense.amount)
     lineItems.push({
-      description: `Expense: ${expense.category.name} - ${expense.description}`,
+      description: `Expense for ${closedPeriodLabel}: ${expense.category.name} - ${expense.description}`,
       quantity: 1,
       unitPrice: amount,
       total: amount,
@@ -536,17 +760,17 @@ export async function generateBiweeklyInvoiceForPeriod(
   const tax = 0 // No tax for now
   const total = subtotal + tax
 
-  // Generate invoice number
-  const invoiceNumber = await generateInvoiceNumber(tenantId)
-
   // Create invoice with line items in a transaction
   const result = await prisma.$transaction(async (tx) => {
+    await assertNoPrimaryInvoiceForPeriod(tx, tenantId, billedPeriod.id)
+    const invoiceNumber = await generateInvoiceNumber(tenantId, tx)
+
     // Create invoice
     const invoice = await tx.invoice.create({
       data: {
         tenantId,
         clientId: client.id,
-        retainerPeriodId: period.id,
+        retainerPeriodId: billedPeriod.id,
         invoiceNumber,
         status: "DRAFT",
         issuedDate: new Date(),
@@ -674,6 +898,7 @@ export async function generateOverageInvoiceForPreviousPeriod(
 
   const retainer = period.retainer
   const client = retainer.client
+  const closedPeriodLabel = formatPeriodRange(period)
 
   // Get travel and overage entries from this period that weren't invoiced yet
   const travelEntries = period.timeEntries.filter((e) => e.isTravelTime)
@@ -695,7 +920,7 @@ export async function generateOverageInvoiceForPreviousPeriod(
     const travelCost = travelHours * travelRate
 
     lineItems.push({
-      description: `Travel Time (${travelHours.toFixed(2)} hours @ $${travelRate}/hr)`,
+      description: `Travel Time for ${closedPeriodLabel} (${travelHours.toFixed(2)} hours @ $${travelRate}/hr)`,
       quantity: travelHours,
       unitPrice: travelRate,
       total: travelCost,
@@ -713,7 +938,7 @@ export async function generateOverageInvoiceForPreviousPeriod(
     const overageCost = overageHours * overageRate
 
     lineItems.push({
-      description: `Overage Hours (${overageHours.toFixed(2)} hours @ $${overageRate}/hr)`,
+      description: `Overage Hours for ${closedPeriodLabel} (${overageHours.toFixed(2)} hours @ $${overageRate}/hr)`,
       quantity: overageHours,
       unitPrice: overageRate,
       total: overageCost,

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 type BillingCycle = "MONTHLY" | "BIWEEKLY"
+type BillingTiming = "PREPAID" | "POSTPAID"
 
 export default function NewRetainerPage() {
   const router = useRouter()
@@ -16,6 +17,7 @@ export default function NewRetainerPage() {
   const [error, setError] = useState("")
   const [clients, setClients] = useState<any[]>([])
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY")
+  const [billingTiming, setBillingTiming] = useState<BillingTiming>("POSTPAID")
   const [selectedClientId, setSelectedClientId] = useState("")
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export default function NewRetainerPage() {
       clientId: formData.get("clientId") as string,
       name: formData.get("name") as string,
       billingCycle,
+      billingTiming,
       includedHours: parseFloat(formData.get("includedHours") as string),
       ratePerHour: parseFloat(formData.get("ratePerHour") as string),
       overageRate: formData.get("overageRate") 
@@ -173,6 +176,25 @@ export default function NewRetainerPage() {
                 {isBiweekly
                   ? "Biweekly retainers currently close every Sunday and span 14 days."
                   : "Monthly retainers bill on the same day each month."}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="billingTiming">Invoice Timing *</Label>
+              <select
+                id="billingTiming"
+                name="billingTiming"
+                value={billingTiming}
+                onChange={(e) => setBillingTiming(e.target.value as BillingTiming)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="POSTPAID">Postpay</option>
+                <option value="PREPAID">Prepay</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {billingTiming === "PREPAID"
+                  ? "Creates a draft invoice for the current service period right away, then bills each new period in advance."
+                  : "Invoices the retainer fee after each service period closes."}
               </p>
             </div>
 

@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 type BillingCycle = "MONTHLY" | "BIWEEKLY"
+type BillingTiming = "PREPAID" | "POSTPAID"
 
 export default function EditRetainerPage({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -17,6 +18,7 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
   const [error, setError] = useState("")
   const [retainer, setRetainer] = useState<any>(null)
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY")
+  const [billingTiming, setBillingTiming] = useState<BillingTiming>("POSTPAID")
 
   useEffect(() => {
     fetch(`/api/retainers/${params.id}`)
@@ -26,6 +28,7 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
         if (data.success && data.data) {
           setRetainer(data.data)
           setBillingCycle((data.data.billingCycle || "MONTHLY") as BillingCycle)
+          setBillingTiming((data.data.billingTiming || "POSTPAID") as BillingTiming)
         } else {
           console.error('[Retainer Edit] API error:', data.error)
           setError(data.error || "Failed to load retainer")
@@ -48,6 +51,7 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
     const data = {
       name: formData.get("name") as string,
       billingCycle,
+      billingTiming,
       includedHours: parseFloat(formData.get("includedHours") as string),
       ratePerHour: parseFloat(formData.get("ratePerHour") as string),
       overageRate: formData.get("overageRate") 
@@ -174,6 +178,25 @@ export default function EditRetainerPage({ params }: { params: { id: string } })
                 {isBiweekly
                   ? "Biweekly retainers currently close every Sunday and span 14 days."
                   : "Monthly retainers bill on the same day each month."}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="billingTiming">Invoice Timing *</Label>
+              <select
+                id="billingTiming"
+                name="billingTiming"
+                value={billingTiming}
+                onChange={(e) => setBillingTiming(e.target.value as BillingTiming)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                <option value="POSTPAID">Postpay</option>
+                <option value="PREPAID">Prepay</option>
+              </select>
+              <p className="text-xs text-muted-foreground">
+                {billingTiming === "PREPAID"
+                  ? "New periods will draft the retainer fee invoice in advance. Existing invoices are not rewritten."
+                  : "New periods will invoice the retainer fee after the service period closes."}
               </p>
             </div>
 

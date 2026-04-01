@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
 import { getRetainerPeriodBoundary } from "@/lib/timezone"
+import { generatePrepaidInvoiceForCurrentPeriod } from "@/lib/invoice"
 
 // GET /api/retainers - List all retainers
 export async function GET(request: NextRequest) {
@@ -95,6 +96,7 @@ const createRetainerSchema = z.object({
   perDiemRate: z.number().positive().optional(),
   timezone: z.string().optional(),
   billingCycle: z.enum(["MONTHLY", "BIWEEKLY"]).default("MONTHLY"),
+  billingTiming: z.enum(["PREPAID", "POSTPAID"]).default("POSTPAID"),
   billingDay: z.number().int().optional(),
   startDate: z.string(), // ISO date string
 }).superRefine((data, ctx) => {
@@ -159,6 +161,8 @@ export async function POST(request: NextRequest) {
       validatedData.billingCycle === "BIWEEKLY"
         ? 0
         : (validatedData.billingDay ?? 1)
+    let createdRetainerId: string | null = null
+    let initialPeriodId: string | null = null
 
     // Create retainer
     const retainer = await prisma.retainer.create({
@@ -182,6 +186,7 @@ export async function POST(request: NextRequest) {
         perDiemRate: validatedData.perDiemRate,
         timezone,
         billingCycle: validatedData.billingCycle,
+        billingTiming: validatedData.billingTiming,
         billingDay,
         startDate,
       },
@@ -189,25 +194,54 @@ export async function POST(request: NextRequest) {
         client: true,
       },
     })
+    createdRetainerId = retainer.id
 
-    // Create the initial open period that contains the retainer start date.
-    const { startUtc, endUtc } = getRetainerPeriodBoundary(
-      startDate,
-      timezone,
-      validatedData.billingCycle,
-      billingDay
-    )
+    try {
+      // Create the initial open period that contains the retainer start date.
+      const { startUtc, endUtc } = getRetainerPeriodBoundary(
+        startDate,
+        timezone,
+        validatedData.billingCycle,
+        billingDay
+      )
 
-    await prisma.retainerPeriod.create({
-      data: {
-        retainerId: retainer.id,
-        periodStart: startUtc,
-        periodEnd: endUtc,
-        includedHours: validatedData.includedHours,
-        rolloverHoursIn: 0,
-        status: "OPEN",
-      },
-    })
+      const initialPeriod = await prisma.retainerPeriod.create({
+        data: {
+          retainerId: retainer.id,
+          periodStart: startUtc,
+          periodEnd: endUtc,
+          includedHours: validatedData.includedHours,
+          rolloverHoursIn: 0,
+          status: "OPEN",
+        },
+      })
+      initialPeriodId = initialPeriod.id
+
+      if (validatedData.billingTiming === "PREPAID") {
+        await generatePrepaidInvoiceForCurrentPeriod(
+          initialPeriod.id,
+          session.user.tenantId
+        )
+      }
+    } catch (creationError) {
+      if (initialPeriodId) {
+        await prisma.invoice.deleteMany({
+          where: { retainerPeriodId: initialPeriodId },
+        }).catch((rollbackError) => {
+          console.error("Failed to clean up invoice after prepaid invoice error:", rollbackError)
+        })
+      }
+
+      if (createdRetainerId) {
+        await prisma.retainer.delete({
+          where: { id: createdRetainerId },
+        }).catch((rollbackError) => {
+          console.error("Failed to roll back retainer after prepaid invoice error:", rollbackError)
+        })
+      }
+
+      throw creationError
+    }
 
     return NextResponse.json({
       success: true,

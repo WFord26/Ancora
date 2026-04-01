@@ -253,6 +253,11 @@ enum RetainerStatus {
   CANCELLED
 }
 
+enum BillingTiming {
+  PREPAID
+  POSTPAID
+}
+
 model Retainer {
   id                   String           @id @default(cuid())
   tenantId             String           @map("tenant_id")
@@ -275,6 +280,7 @@ model Retainer {
   perDiemRate           Decimal?           @map("per_diem_rate") @db.Decimal(10, 2)
   timezone             String           @default("America/New_York") // IANA timezone
   billingCycle         BillingCycle     @default(MONTHLY) @map("billing_cycle") // MONTHLY or BIWEEKLY
+  billingTiming        BillingTiming    @default(POSTPAID) @map("billing_timing") // Invoice before or after the service period
   billingDay           Int              @default(1) @map("billing_day") // 1-28 for monthly OR day of week for biweekly (0=Sunday)
   startDate            DateTime         @map("start_date") @db.Date
   endDate              DateTime?        @map("end_date") @db.Date

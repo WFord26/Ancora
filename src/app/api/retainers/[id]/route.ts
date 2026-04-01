@@ -68,6 +68,7 @@ const updateRetainerSchema = z.object({
   mileageRate: z.number().positive().optional(),
   perDiemRate: z.number().positive().optional(),
   billingCycle: z.enum(["MONTHLY", "BIWEEKLY"]).optional(),
+  billingTiming: z.enum(["PREPAID", "POSTPAID"]).optional(),
   billingDay: z.number().int().optional(),
   endDate: z.string().optional(), // ISO date string
 })

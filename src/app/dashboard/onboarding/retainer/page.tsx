@@ -25,6 +25,7 @@ export default function RetainerSetupPage() {
   const [skipRetainer, setSkipRetainer] = useState(false)
   const [selectedClient, setSelectedClient] = useState("")
   const [billingCycle, setBillingCycle] = useState<"MONTHLY" | "BIWEEKLY">("MONTHLY")
+  const [billingTiming, setBillingTiming] = useState<"PREPAID" | "POSTPAID">("POSTPAID")
 
   useEffect(() => {
     fetch("/api/clients")
@@ -57,6 +58,7 @@ export default function RetainerSetupPage() {
         clientId: selectedClient,
         name: formData.get("name") as string,
         billingCycle,
+        billingTiming,
         includedHours: parseFloat(formData.get("includedHours") as string),
         ratePerHour: parseFloat(formData.get("ratePerHour") as string),
         overageRate: formData.get("overageRate")
@@ -185,6 +187,27 @@ export default function RetainerSetupPage() {
                       {isBiweekly
                         ? "Biweekly retainers currently close every Sunday and span 14 days."
                         : "Monthly retainers bill on the same day each month."}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="billingTiming">Invoice Timing *</Label>
+                    <Select
+                      value={billingTiming}
+                      onValueChange={(value) => setBillingTiming(value as "PREPAID" | "POSTPAID")}
+                    >
+                      <SelectTrigger id="billingTiming">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="POSTPAID">Postpay</SelectItem>
+                        <SelectItem value="PREPAID">Prepay</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {billingTiming === "PREPAID"
+                        ? "We’ll draft the first invoice for the current service period as soon as the retainer is created."
+                        : "We’ll draft invoices after each service period closes."}
                     </p>
                   </div>
 

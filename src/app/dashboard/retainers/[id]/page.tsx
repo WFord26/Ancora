@@ -137,6 +137,13 @@ export default async function RetainerDetailPage({
               <p className="mt-1">{isBiweekly ? "Biweekly" : "Monthly"}</p>
             </div>
 
+            <div>
+              <p className="text-sm font-medium text-muted-foreground">Invoice Timing</p>
+              <p className="mt-1">
+                {retainer.billingTiming === "PREPAID" ? "Prepay" : "Postpay"}
+              </p>
+            </div>
+
             {retainer.overageRate && (
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Overage Rate</p>

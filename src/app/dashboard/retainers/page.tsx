@@ -54,6 +54,7 @@ export default async function RetainersPage() {
               <TableHead>Retainer Name</TableHead>
               <TableHead>Hours/Month</TableHead>
               <TableHead>Monthly Fee</TableHead>
+              <TableHead>Timing</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -61,7 +62,7 @@ export default async function RetainersPage() {
           <TableBody>
             {retainers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                <TableCell colSpan={7} className="text-center text-muted-foreground">
                   No retainers yet. Create your first retainer to get started.
                 </TableCell>
               </TableRow>
@@ -86,6 +87,9 @@ export default async function RetainersPage() {
                   </TableCell>
                   <TableCell>{Number(retainer.includedHours)}</TableCell>
                   <TableCell>${(Number(retainer.ratePerHour) * Number(retainer.includedHours)).toFixed(2)}</TableCell>
+                  <TableCell>
+                    {retainer.billingTiming === "PREPAID" ? "Prepay" : "Postpay"}
+                  </TableCell>
                   <TableCell>
                     <Badge
                       variant={
