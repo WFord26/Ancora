@@ -1,6 +1,7 @@
 # Set CADDY_DOMAIN in .env to a public hostname such as app.example.com.
 # Public domains get automatic TLS; localhost uses Caddy's local certificate flow.
 {$CADDY_DOMAIN:localhost} {
+  tls certs/fullchain.pem /certs/privkey.pem
   encode gzip zstd
   reverse_proxy frontend:3000
 }
