@@ -3,6 +3,8 @@ import { authOptions } from "@/lib/auth"
 import { NextResponse } from "next/server"
 import { prisma } from "@/db"
 
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/auth/tenants
  * Get all tenants for the current user

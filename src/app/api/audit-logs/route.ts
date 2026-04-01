@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 
+export const dynamic = "force-dynamic"
+
 // GET /api/audit-logs — Admin-only: retrieve paginated audit log entries
 export async function GET(request: NextRequest) {
   try {

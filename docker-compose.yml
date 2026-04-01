@@ -1,62 +1,84 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: ancora-postgres
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ancora-frontend
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-ancora}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ancora_dev_password}
-      POSTGRES_DB: ${POSTGRES_DB:-ancora}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ancora.app}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-}
+      DATABASE_URL: ${DATABASE_URL}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@example.com}
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      QBO_CLIENT_ID: ${QBO_CLIENT_ID:-}
+      QBO_CLIENT_SECRET: ${QBO_CLIENT_SECRET:-}
+      QBO_REDIRECT_URI: ${QBO_REDIRECT_URI:-}
+      REDIS_URL: redis://redis:6379
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      XERO_CLIENT_ID: ${XERO_CLIENT_ID:-}
+      XERO_CLIENT_SECRET: ${XERO_CLIENT_SECRET:-}
+      XERO_REDIRECT_URI: ${XERO_REDIRECT_URI:-}
+      PORT: 3000
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ancora}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - "${APP_PORT:-3000}:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ancora-backend
+    restart: unless-stopped
+    command: npm run worker
+    environment:
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@ancora.app}
+      AZURE_STORAGE_CONNECTION_STRING: ${AZURE_STORAGE_CONNECTION_STRING:-}
+      AZURE_STORAGE_CONTAINER_NAME: ${AZURE_STORAGE_CONTAINER_NAME:-}
+      DATABASE_URL: ${DATABASE_URL}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@example.com}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NODE_ENV: production
+      QBO_CLIENT_ID: ${QBO_CLIENT_ID:-}
+      QBO_CLIENT_SECRET: ${QBO_CLIENT_SECRET:-}
+      QBO_REDIRECT_URI: ${QBO_REDIRECT_URI:-}
+      REDIS_URL: redis://redis:6379
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:-}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      XERO_CLIENT_ID: ${XERO_CLIENT_ID:-}
+      XERO_CLIENT_SECRET: ${XERO_CLIENT_SECRET:-}
+      XERO_REDIRECT_URI: ${XERO_REDIRECT_URI:-}
+    depends_on:
+      redis:
+        condition: service_healthy
 
   redis:
     image: redis:7-alpine
     container_name: ancora-redis
     restart: unless-stopped
+    command: redis-server --appendonly yes
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Optional: pgAdmin for database management
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: ancora-pgadmin
-    restart: unless-stopped
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@ancora.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: 'False'
-    ports:
-      - "${PGADMIN_PORT:-5050}:80"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    depends_on:
-      - postgres
-    profiles:
-      - tools
-
 volumes:
-  postgres_data:
-    driver: local
   redis_data:
-    driver: local
-  pgadmin_data:
     driver: local

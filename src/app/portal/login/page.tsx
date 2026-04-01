@@ -2,11 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 
 export default function PortalLoginPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
@@ -16,11 +15,11 @@ export default function PortalLoginPage() {
 
   // Pick up error from magic link verification redirect
   useEffect(() => {
-    const errorParam = searchParams.get("error")
+    const errorParam = new URLSearchParams(window.location.search).get("error")
     if (errorParam) {
       setError(errorParam)
     }
-  }, [searchParams])
+  }, [])
 
   const handlePasswordLogin = async (e: React.FormEvent) => {
     e.preventDefault()

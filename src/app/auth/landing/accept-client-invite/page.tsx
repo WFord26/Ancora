@@ -1,35 +1,34 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
 
 export default function AcceptClientInvitePage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const token = searchParams.get("token")
-  
+  const [token, setToken] = useState("")
   const [status, setStatus] = useState<"loading" | "error" | "valid" | "completed">("loading")
   const [invitation, setInvitation] = useState<any>(null)
   const [error, setError] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (!token) {
+    const invitationToken = new URLSearchParams(window.location.search).get("token")
+
+    if (!invitationToken) {
       setError("Invalid invitation link")
       setStatus("error")
       return
     }
 
-    verifyInvitation()
-  }, [token])
+    setToken(invitationToken)
+    verifyInvitation(invitationToken)
+  }, [])
 
-  async function verifyInvitation() {
+  async function verifyInvitation(invitationToken: string) {
     try {
-      const res = await fetch(`/api/auth/client-invitations/${token}`)
+      const res = await fetch(`/api/auth/client-invitations/${invitationToken}`)
       const data = await res.json()
 
       if (!res.ok) {

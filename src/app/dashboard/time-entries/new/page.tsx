@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function NewTimeEntryPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [clients, setClients] = useState<any[]>([])
@@ -118,19 +117,17 @@ export default function NewTimeEntryPage() {
     }
   }
 
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date().toISOString().split("T")[0]
-    const now = new Date().toTimeString().slice(0, 5)
-    
-    // Default client from URL param
-    const defaultClientId = searchParams.get("clientId") || ""
-    
-    // Set client if provided in URL
-    useEffect(() => {
-      if (defaultClientId) {
-        setSelectedClientId(defaultClientId)
-      }
-    }, [defaultClientId])
+  // Set client if provided in URL
+  useEffect(() => {
+    const clientId = new URLSearchParams(window.location.search).get("clientId")
+    if (clientId) {
+      setSelectedClientId(clientId)
+    }
+  }, [])
+
+  // Get today's date in YYYY-MM-DD format
+  const today = new Date().toISOString().split("T")[0]
+  const now = new Date().toTimeString().slice(0, 5)
 
   return (
     <div className="max-w-2xl space-y-6">

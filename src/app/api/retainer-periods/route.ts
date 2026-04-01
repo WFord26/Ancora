@@ -3,6 +3,8 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/retainer-periods?retainerId=xxx
  * Returns periods for a retainer (most recent first)

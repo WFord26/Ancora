@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { signIn } from "next-auth/react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,13 +12,18 @@ import { AlertCircle, Loader2 } from "lucide-react"
 
 export default function LandingSignInPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard"
-  
+  const [callbackUrl, setCallbackUrl] = useState("/dashboard")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    const nextCallbackUrl =
+      new URLSearchParams(window.location.search).get("callbackUrl") || "/dashboard"
+
+    setCallbackUrl(nextCallbackUrl)
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -40,7 +45,7 @@ export default function LandingSignInPage() {
         router.push(callbackUrl)
         router.refresh()
       }
-    } catch (err) {
+    } catch {
       setError("An error occurred. Please try again.")
       setIsLoading(false)
     }

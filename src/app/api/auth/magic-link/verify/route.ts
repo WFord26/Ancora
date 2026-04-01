@@ -3,6 +3,8 @@ import { prisma } from "@/db"
 import { encode } from "next-auth/jwt"
 import { cookies } from "next/headers"
 
+export const dynamic = "force-dynamic"
+
 /**
  * GET /api/auth/magic-link/verify
  * 

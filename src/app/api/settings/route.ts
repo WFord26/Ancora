@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { z } from "zod"
 
+export const dynamic = "force-dynamic"
+
 // Settings validation schema
 const settingsSchema = z.object({
   companyName: z.string().optional(),

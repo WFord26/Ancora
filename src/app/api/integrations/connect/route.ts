@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { buildOAuthUrl } from "@/integrations/qbo"
 import { buildXeroOAuthUrl } from "@/integrations/xero"
 
+export const dynamic = "force-dynamic"
+
 const SUPPORTED_PROVIDERS = ["qbo", "xero"] as const
 type SupportedProvider = (typeof SUPPORTED_PROVIDERS)[number]
 

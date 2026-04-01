@@ -4,6 +4,8 @@ import { authOptions } from "@/lib/auth"
 import { prisma } from "@/db"
 import { getStripeSetupStatus } from "@/lib/stripe"
 
+export const dynamic = "force-dynamic"
+
 // GET /api/integrations - List all integration connections for the tenant
 export async function GET(request: NextRequest) {
   try {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,11 +12,11 @@ type BillingCycle = "MONTHLY" | "BIWEEKLY"
 
 export default function NewRetainerPage() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const [clients, setClients] = useState<any[]>([])
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("MONTHLY")
+  const [selectedClientId, setSelectedClientId] = useState("")
 
   useEffect(() => {
     fetch("/api/clients")
@@ -27,6 +27,11 @@ export default function NewRetainerPage() {
         }
       })
       .catch(() => setClients([]))
+  }, [])
+
+  useEffect(() => {
+    const clientId = new URLSearchParams(window.location.search).get("clientId") || ""
+    setSelectedClientId(clientId)
   }, [])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -95,7 +100,6 @@ export default function NewRetainerPage() {
     }
   }
 
-  const defaultClientId = searchParams.get("clientId") || ""
   const isBiweekly = billingCycle === "BIWEEKLY"
 
   return (
@@ -130,7 +134,8 @@ export default function NewRetainerPage() {
                 id="clientId"
                 name="clientId"
                 required
-                defaultValue={defaultClientId}
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 <option value="">Select a client</option>
