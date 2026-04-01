@@ -64,8 +64,8 @@ export default function EditTimeEntryPage({ params }: { params: { id: string } }
       startTime: new Date(startDateTime).toISOString(),
       endTime: new Date(endDateTime).toISOString(),
       externalDescription: formData.get("externalDescription") as string,
-      internalNotes: formData.get("internalNotes") as string || null,
-      categoryId: formData.get("categoryId") as string || null,
+      internalNotes: (formData.get("internalNotes") as string) || undefined,
+      categoryId: (formData.get("categoryId") as string) || undefined,
       isTravelTime: (formData.get("isTravelTime") === "on"),
     }
 

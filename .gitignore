@@ -50,3 +50,6 @@ prisma/*.db-journal
 .idea/
 *.swp
 *.swo
+
+# Certs
+certs/

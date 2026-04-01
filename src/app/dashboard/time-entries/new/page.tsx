@@ -74,7 +74,7 @@ export default function NewTimeEntryPage() {
     
     // Find timezone from selected retainer
     const selectedRetainer = retainers.find((r) => r.id === retainerId)
-    const timezone = selectedRetainer?.client?.timezone || "America/New_York"
+    const timezone = selectedRetainer?.timezone || "America/New_York"
     
     // Combine date and time for start
     const startDate = formData.get("startDate") as string
@@ -92,8 +92,8 @@ export default function NewTimeEntryPage() {
       endTime: endDateTime,
       timezone: timezone,
       externalDescription: formData.get("externalDescription") as string,
-      internalNotes: formData.get("internalNotes") as string || null,
-      categoryId: formData.get("categoryId") as string || null,
+      internalNotes: (formData.get("internalNotes") as string) || undefined,
+      categoryId: (formData.get("categoryId") as string) || undefined,
       isTravelTime,
     }
 

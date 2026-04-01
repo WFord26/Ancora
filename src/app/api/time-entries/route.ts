@@ -89,12 +89,12 @@ export async function GET(request: NextRequest) {
 // POST /api/time-entries - Create a new time entry
 const createTimeEntrySchema = z.object({
   retainerId: z.string().min(1, "Retainer is required"),
-  categoryId: z.string().optional(),
+  categoryId: z.string().nullish(),
   startTime: z.string(), // ISO string
   endTime: z.string(), // ISO string
   timezone: z.string().default("America/New_York"),
   externalDescription: z.string().min(1, "Description is required"),
-  internalNotes: z.string().optional(),
+  internalNotes: z.string().nullish(),
   isBillable: z.boolean().default(true),
   isTravelTime: z.boolean().default(false),
 })

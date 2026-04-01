@@ -60,12 +60,12 @@ export async function GET(
 
 // PATCH /api/time-entries/[id] - Update time entry
 const updateTimeEntrySchema = z.object({
-  categoryId: z.string().optional(),
+  categoryId: z.string().nullish(),
   startTime: z.string().optional(),
   endTime: z.string().optional(),
   timezone: z.string().optional(),
   externalDescription: z.string().min(1).optional(),
-  internalNotes: z.string().optional(),
+  internalNotes: z.string().nullish(),
   isBillable: z.boolean().optional(),
   isTravelTime: z.boolean().optional(),
   status: z.enum(["DRAFT", "SUBMITTED", "APPROVED"]).optional(),
