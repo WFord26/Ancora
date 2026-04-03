@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation"
 import { useEffect, useState } from "react"
 import { LogOut, Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import AppSurface from "@/components/layout/app-surface"
 import { cn } from "@/lib/utils"
 
 type DashboardShellProps = {
@@ -67,8 +68,8 @@ function DashboardNavSection({
             className={cn(
               "block rounded-md px-3 py-2 text-sm font-medium transition-colors",
               isActive
-                ? "bg-accent text-accent-foreground"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                ? "bg-white/10 text-white shadow-inner shadow-slate-950/40"
+                : "text-slate-300 hover:bg-white/5 hover:text-white"
             )}
           >
             {item.label}
@@ -94,8 +95,8 @@ export default function DashboardShell({
   const isAdmin = userRole === "ADMIN"
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
+    <AppSurface>
+      <header className="border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-xl">
         <div className="flex h-16 items-center gap-3 px-4 md:px-6">
           <Dialog.Root open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
             <Dialog.Trigger asChild>
@@ -111,9 +112,9 @@ export default function DashboardShell({
             </Dialog.Trigger>
 
             <Dialog.Portal>
-              <Dialog.Overlay className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm md:hidden" />
-              <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col border-r bg-background shadow-xl outline-none md:hidden">
-                <div className="flex h-16 items-center justify-between border-b px-4">
+              <Dialog.Overlay className="fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm md:hidden" />
+              <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-full max-w-xs flex-col border-r border-slate-800/80 bg-slate-950/95 shadow-xl outline-none md:hidden">
+                <div className="flex h-16 items-center justify-between border-b border-slate-800/80 px-4">
                   <Dialog.Title className="sr-only">
                     Dashboard navigation
                   </Dialog.Title>
@@ -136,9 +137,9 @@ export default function DashboardShell({
                   </Dialog.Close>
                 </div>
 
-                <div className="border-b px-4 py-4">
-                  <p className="truncate text-sm font-medium">{userEmail}</p>
-                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+                <div className="border-b border-slate-800/80 px-4 py-4">
+                  <p className="truncate text-sm font-medium text-white">{userEmail}</p>
+                  <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
                     {userRole}
                   </p>
                 </div>
@@ -152,7 +153,7 @@ export default function DashboardShell({
 
                   {isAdmin && (
                     <>
-                      <div className="my-3 border-t" />
+                      <div className="my-3 border-t border-slate-800/80" />
                       <DashboardNavSection
                         items={adminNavItems}
                         pathname={pathname}
@@ -161,11 +162,11 @@ export default function DashboardShell({
                     </>
                   )}
 
-                  <div className="my-3 border-t" />
+                  <div className="my-3 border-t border-slate-800/80" />
                   <Link
                     href="/logout"
                     onClick={() => setMobileNavOpen(false)}
-                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                    className="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
                   >
                     <LogOut className="h-4 w-4" />
                     Log Out
@@ -186,13 +187,18 @@ export default function DashboardShell({
           </Link>
 
           <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-4">
-            <span className="hidden truncate text-sm text-muted-foreground sm:inline">
+            <span className="hidden truncate text-sm text-slate-300 sm:inline">
               {userEmail}
             </span>
-            <span className="inline-flex items-center rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+            <span className="inline-flex items-center rounded-full bg-sky-500/15 px-2.5 py-0.5 text-xs font-medium text-sky-300">
               {userRole}
             </span>
-            <Button variant="ghost" size="sm" asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-slate-300 hover:bg-white/5 hover:text-white"
+              asChild
+            >
               <Link href="/logout">Log Out</Link>
             </Button>
           </div>
@@ -200,13 +206,13 @@ export default function DashboardShell({
       </header>
 
       <div className="flex">
-        <aside className="hidden w-64 border-r md:block">
+        <aside className="hidden w-64 border-r border-slate-800/80 bg-slate-950/35 backdrop-blur md:block">
           <nav className="space-y-1 p-4">
             <DashboardNavSection items={coreNavItems} pathname={pathname} />
 
             {isAdmin && (
               <>
-                <div className="my-2 border-t" />
+                <div className="my-2 border-t border-slate-800/80" />
                 <DashboardNavSection items={adminNavItems} pathname={pathname} />
               </>
             )}
@@ -215,6 +221,6 @@ export default function DashboardShell({
 
         <main className="flex-1 p-4 md:p-6">{children}</main>
       </div>
-    </div>
+    </AppSurface>
   )
 }

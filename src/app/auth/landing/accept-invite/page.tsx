@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Loader2 } from "lucide-react"
+import AppSurface from "@/components/layout/app-surface"
 
 export default function AcceptInvitePage() {
   const [token, setToken] = useState("")
@@ -46,56 +47,61 @@ export default function AcceptInvitePage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <AppSurface>
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      </AppSurface>
     )
   }
 
   if (status === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-        <Card className="w-full max-w-sm border-destructive/20">
+      <AppSurface>
+        <div className="flex min-h-screen items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-sm border-destructive/20 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
           <CardHeader>
             <div className="flex justify-center mb-4">
               <AlertCircle className="h-12 w-12 text-destructive" />
             </div>
-            <CardTitle className="text-center">Invalid Invitation</CardTitle>
+            <CardTitle className="text-center text-white">Invalid Invitation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground text-center">{error}</p>
+            <p className="text-center text-sm text-slate-400">{error}</p>
             <Button className="w-full" variant="outline" asChild>
               <Link href="/">Return Home</Link>
             </Button>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+        </div>
+      </AppSurface>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-      <div className="w-full max-w-sm space-y-6">
-        <Card>
+    <AppSurface>
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm space-y-6">
+          <Card className="border-slate-800/80 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Accept Invitation</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl text-white">Accept Invitation</CardTitle>
+            <CardDescription className="text-slate-400">
               You've been invited to join {invitation?.tenant?.name}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg">
+            <div className="rounded-lg bg-slate-950/60 p-4">
               <p className="text-sm">
-                <span className="text-muted-foreground">Email:</span>{" "}
+                <span className="text-slate-400">Email:</span>{" "}
                 <span className="font-medium">{invitation?.email}</span>
               </p>
               <p className="text-sm mt-2">
-                <span className="text-muted-foreground">Role:</span>{" "}
+                <span className="text-slate-400">Role:</span>{" "}
                 <span className="font-medium">{invitation?.role}</span>
               </p>
             </div>
 
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-slate-400">
               Click the button below to create your account and accept this invitation.
             </p>
 
@@ -105,15 +111,16 @@ export default function AcceptInvitePage() {
               </Link>
             </Button>
 
-            <p className="text-center text-sm text-muted-foreground">
+            <p className="text-center text-sm text-slate-400">
               Already have an account?{" "}
-              <Link href="/auth/signin" className="font-medium text-foreground hover:underline">
+              <Link href="/auth/signin" className="font-medium text-sky-300 hover:underline">
                 Sign in here
               </Link>
             </p>
           </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
-    </div>
+    </AppSurface>
   )
 }

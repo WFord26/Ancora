@@ -4,6 +4,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { authOptions } from "@/lib/auth"
 import { Button } from "@/components/ui/button"
+import AppSurface from "@/components/layout/app-surface"
 
 export default async function PortalLayout({
   children,
@@ -22,9 +23,9 @@ export default async function PortalLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <AppSurface>
       {/* Header */}
-      <header className="border-b">
+      <header className="border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-xl">
         <div className="flex h-16 items-center px-4 md:px-6">
           <div className="flex items-center space-x-4">
             <Image
@@ -34,14 +35,19 @@ export default async function PortalLayout({
               height={40}
               priority
             />
-            <span className="text-sm text-muted-foreground">Client Portal</span>
+            <span className="text-sm text-slate-400">Client Portal</span>
           </div>
 
           <div className="ml-auto flex items-center space-x-4">
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm text-slate-300">
               {session.user.email}
             </span>
-            <Button variant="ghost" size="sm" asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-slate-300 hover:bg-white/5 hover:text-white"
+              asChild
+            >
               <Link href="/logout">Log Out</Link>
             </Button>
           </div>
@@ -51,35 +57,35 @@ export default async function PortalLayout({
       {/* Main Content */}
       <div className="flex">
         {/* Sidebar */}
-        <aside className="hidden w-56 border-r md:block">
+        <aside className="hidden w-56 border-r border-slate-800/80 bg-slate-950/35 backdrop-blur md:block">
           <nav className="space-y-1 p-4">
             <a
               href="/portal"
-              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
             >
               Overview
             </a>
             <a
               href="/portal/invoices"
-              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
             >
               Invoices
             </a>
             <a
               href="/portal/retainers"
-              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
             >
               Retainers
             </a>
             <a
               href="/portal/expenses"
-              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
             >
               Expenses
             </a>
             <a
               href="/portal/time-entries"
-              className="block rounded-md px-3 py-2 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+              className="block rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/5 hover:text-white"
             >
               Time Log
             </a>
@@ -89,6 +95,6 @@ export default async function PortalLayout({
         {/* Page Content */}
         <main className="flex-1 p-6">{children}</main>
       </div>
-    </div>
+    </AppSurface>
   )
 }

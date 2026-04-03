@@ -11,29 +11,78 @@ import OnboardingLayout from "@/components/onboarding/onboarding-layout"
 export default function OnboardingCompletePage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
+  const [completionError, setCompletionError] = useState("")
 
   useEffect(() => {
     // Mark onboarding as complete
     async function completeOnboarding() {
       try {
-        await fetch("/api/onboarding/status", {
+        setCompletionError("")
+
+        const response = await fetch("/api/onboarding/status", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
         })
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => null)
+          throw new Error(data?.error || "Failed to complete onboarding")
+        }
+
+        router.refresh()
       } catch (err) {
         console.error("Error completing onboarding:", err)
+        setCompletionError(
+          err instanceof Error
+            ? err.message
+            : "We couldn't finalize onboarding. Try again."
+        )
       } finally {
         setIsLoading(false)
       }
     }
 
     completeOnboarding()
-  }, [])
+  }, [router])
+
+  async function retryCompletion() {
+    setIsLoading(true)
+    setCompletionError("")
+
+    try {
+      const response = await fetch("/api/onboarding/status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error || "Failed to complete onboarding")
+      }
+
+      router.refresh()
+    } catch (err) {
+      console.error("Retry completion error:", err)
+      setCompletionError(
+        err instanceof Error
+          ? err.message
+          : "We couldn't finalize onboarding. Try again."
+      )
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   return (
     <OnboardingLayout currentStep={5} totalSteps={5}>
       <CardContent className="pt-8">
         <div className="space-y-8">
+          {completionError && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+              {completionError}
+            </div>
+          )}
+
           {/* Success message */}
           <div className="text-center space-y-4">
             <div className="flex justify-center">
@@ -157,13 +206,21 @@ export default function OnboardingCompletePage() {
             </Button>
             <Button
               onClick={() => {
-                router.push("/dashboard")
+                window.location.assign("/dashboard")
               }}
-              disabled={isLoading}
+              disabled={isLoading || !!completionError}
             >
-              Go to Dashboard
+              {isLoading ? "Finalizing..." : "Go to Dashboard"}
             </Button>
           </div>
+
+          {completionError && (
+            <div className="flex justify-center">
+              <Button variant="secondary" onClick={retryCompletion} disabled={isLoading}>
+                Try Completing Onboarding Again
+              </Button>
+            </div>
+          )}
         </div>
       </CardContent>
     </OnboardingLayout>

@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, CheckCircle2, Loader2 } from "lucide-react"
+import AppSurface from "@/components/layout/app-surface"
 
 export default function AcceptClientInvitePage() {
   const [token, setToken] = useState("")
@@ -70,88 +71,95 @@ export default function AcceptClientInvitePage() {
 
   if (status === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
+      <AppSurface>
+        <div className="flex min-h-screen items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+        </div>
+      </AppSurface>
     )
   }
 
   if (status === "error") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-        <Card className="w-full max-w-sm border-destructive/20">
+      <AppSurface>
+        <div className="flex min-h-screen items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-sm border-destructive/20 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
           <CardHeader>
             <div className="flex justify-center mb-4">
               <AlertCircle className="h-12 w-12 text-destructive" />
             </div>
-            <CardTitle>Invalid Invitation</CardTitle>
+            <CardTitle className="text-white">Invalid Invitation</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground text-center">{error}</p>
+            <p className="text-center text-sm text-slate-400">{error}</p>
             <Button className="w-full" variant="outline" asChild>
               <Link href="/">Return Home</Link>
             </Button>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+        </div>
+      </AppSurface>
     )
   }
 
   if (status === "completed") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-        <Card className="w-full max-w-sm border-green-200 dark:border-green-900">
+      <AppSurface>
+        <div className="flex min-h-screen items-center justify-center px-4 py-12">
+          <Card className="w-full max-w-sm border-emerald-500/30 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
           <CardHeader>
             <div className="flex justify-center mb-4">
               <CheckCircle2 className="h-12 w-12 text-green-600" />
             </div>
-            <CardTitle className="text-center">Invitation Accepted!</CardTitle>
-            <CardDescription className="text-center">
+            <CardTitle className="text-center text-white">Invitation Accepted!</CardTitle>
+            <CardDescription className="text-center text-slate-400">
               You now have access to your retainer portal
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-slate-400">
               Welcome to the Ancora client portal! You can now view your retainers, invoices, and billing information.
             </p>
             <Button className="w-full" asChild>
               <Link href="/portal">Access Portal</Link>
             </Button>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+        </div>
+      </AppSurface>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-      <div className="w-full max-w-sm space-y-6">
-        <Card>
+    <AppSurface>
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm space-y-6">
+          <Card className="border-slate-800/80 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Accept Invitation</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl text-white">Accept Invitation</CardTitle>
+            <CardDescription className="text-slate-400">
               You've been invited to view your retainer information
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {invitation && (
               <>
-                <div className="bg-muted p-4 rounded-lg space-y-2">
+                <div className="space-y-2 rounded-lg bg-slate-950/60 p-4">
                   <p className="text-sm">
-                    <span className="text-muted-foreground">Tenant:</span>{" "}
+                    <span className="text-slate-400">Tenant:</span>{" "}
                     <span className="font-medium">{invitation.tenant?.name}</span>
                   </p>
                   <p className="text-sm">
-                    <span className="text-muted-foreground">Client:</span>{" "}
+                    <span className="text-slate-400">Client:</span>{" "}
                     <span className="font-medium">{invitation.client?.companyName}</span>
                   </p>
                   <p className="text-sm">
-                    <span className="text-muted-foreground">Email:</span>{" "}
+                    <span className="text-slate-400">Email:</span>{" "}
                     <span className="font-medium">{invitation.email}</span>
                   </p>
                 </div>
 
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-slate-400">
                   By accepting this invitation, you'll gain access to your retainer portal where you can view invoices, track included hours, and monitor billing.
                 </p>
 
@@ -166,8 +174,9 @@ export default function AcceptClientInvitePage() {
               </>
             )}
           </CardContent>
-        </Card>
+          </Card>
+        </div>
       </div>
-    </div>
+    </AppSurface>
   )
 }

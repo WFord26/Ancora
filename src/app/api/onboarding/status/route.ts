@@ -2,6 +2,7 @@ import { prisma } from "@/db"
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { getOnboardingStatus } from "@/lib/onboarding"
 
 /**
  * GET /api/onboarding/status
@@ -14,46 +15,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const tenant = await prisma.tenant.findUnique({
-      where: { id: session.user.tenantId },
-      select: {
-        onboardingCompleted: true,
-        onboardingCompletedAt: true,
-        timezone: true,
-        _count: {
-          select: {
-            clients: true,
-            retainers: true,
-            users: true,
-          },
-        },
-      },
-    })
+    const status = await getOnboardingStatus(session.user.tenantId)
 
-    if (!tenant) {
+    if (!status) {
       return NextResponse.json(
         { error: "Tenant not found" },
         { status: 404 }
       )
     }
 
-    // Determine current onboarding step based on setup progress
-    let currentStep = 1 // Company setup
-    if (tenant._count.clients > 0) currentStep = 2 // Client created
-    if (tenant._count.retainers > 0) currentStep = 3 // Retainer created
-    if (tenant._count.users > 1) currentStep = 4 // Team invited
-    if (tenant.onboardingCompleted) currentStep = 5 // Completed
-
     return NextResponse.json({
-      completed: tenant.onboardingCompleted,
-      completedAt: tenant.onboardingCompletedAt,
-      currentStep,
-      timezone: tenant.timezone,
-      stats: {
-        clientsCount: tenant._count.clients,
-        retainersCount: tenant._count.retainers,
-        teamMembersCount: tenant._count.users,
-      },
+      ...status,
     })
   } catch (error: any) {
     console.error("Onboarding status error:", error)

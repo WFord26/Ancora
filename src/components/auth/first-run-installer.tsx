@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/select"
 import { COMMON_TIMEZONES, DEFAULT_TIMEZONE } from "@/lib/timezone-options"
 import { AlertCircle, CheckCircle2, Loader2, ServerCog } from "lucide-react"
+import AppSurface from "@/components/layout/app-surface"
 
 export default function FirstRunInstaller() {
   const [step, setStep] = useState<"input" | "success">("input")
@@ -84,20 +85,21 @@ export default function FirstRunInstaller() {
 
   if (step === "success") {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-        <div className="w-full max-w-lg space-y-6">
-          <Card className="border-green-200 dark:border-green-900">
+      <AppSurface>
+        <div className="flex min-h-screen items-center justify-center px-4 py-12">
+          <div className="w-full max-w-lg space-y-6">
+            <Card className="border-emerald-500/30 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
             <CardHeader className="space-y-2">
               <div className="flex justify-center mb-4">
                 <CheckCircle2 className="h-12 w-12 text-green-600" />
               </div>
-              <CardTitle className="text-2xl text-center">Ancora Is Installed</CardTitle>
-              <CardDescription className="text-center">
+              <CardTitle className="text-2xl text-center text-white">Ancora Is Installed</CardTitle>
+              <CardDescription className="text-center text-slate-400">
                 Your first workspace and admin account are ready
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3 text-sm text-muted-foreground">
+              <div className="space-y-3 text-sm text-slate-400">
                 <p>
                   Sign in with <strong>{formData.email}</strong> to continue onboarding.
                 </p>
@@ -106,7 +108,7 @@ export default function FirstRunInstaller() {
                   client, retainer, and team setup.
                 </p>
                 {!emailDelivered && (
-                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-700 dark:text-amber-200">
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-amber-200">
                     Welcome email delivery is not configured yet, but the account was
                     created successfully.
                   </div>
@@ -116,26 +118,28 @@ export default function FirstRunInstaller() {
                 <Link href="/auth/signin">Continue to Sign In</Link>
               </Button>
             </CardContent>
-          </Card>
+            </Card>
+          </div>
         </div>
-      </div>
+      </AppSurface>
     )
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-      <div className="w-full max-w-5xl grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
+    <AppSurface>
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="grid w-full max-w-5xl gap-8 lg:grid-cols-[1.1fr_0.9fr]">
         <div className="space-y-6">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-border/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-700/80 bg-slate-950/40 px-3 py-1 text-xs font-medium text-slate-300">
               <ServerCog className="h-3.5 w-3.5" />
               Production First-Time Installer
             </div>
             <div className="space-y-3">
-              <h1 className="text-4xl font-semibold tracking-tight">
+              <h1 className="text-4xl font-semibold tracking-tight text-white">
                 Install Ancora on this production instance
               </h1>
-              <p className="max-w-2xl text-base text-muted-foreground">
+              <p className="max-w-2xl text-base text-slate-400">
                 This one-time bootstrap creates your first workspace, primary admin,
                 and billing timezone. After installation, the public installer locks
                 and the rest of setup continues inside the app.
@@ -144,26 +148,26 @@ export default function FirstRunInstaller() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Card>
+            <Card className="border-slate-800/80 bg-slate-900/50 backdrop-blur">
               <CardHeader>
-                <CardTitle className="text-base">1. Create Workspace</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-base text-white">1. Create Workspace</CardTitle>
+                <CardDescription className="text-slate-400">
                   Name the business that will own this self-hosted deployment.
                 </CardDescription>
               </CardHeader>
             </Card>
-            <Card>
+            <Card className="border-slate-800/80 bg-slate-900/50 backdrop-blur">
               <CardHeader>
-                <CardTitle className="text-base">2. Create Admin</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-base text-white">2. Create Admin</CardTitle>
+                <CardDescription className="text-slate-400">
                   Set the first admin login used to manage clients, billing, and staff.
                 </CardDescription>
               </CardHeader>
             </Card>
-            <Card>
+            <Card className="border-slate-800/80 bg-slate-900/50 backdrop-blur">
               <CardHeader>
-                <CardTitle className="text-base">3. Finish In-App</CardTitle>
-                <CardDescription>
+                <CardTitle className="text-base text-white">3. Finish In-App</CardTitle>
+                <CardDescription className="text-slate-400">
                   Sign in and continue the guided onboarding for clients and retainers.
                 </CardDescription>
               </CardHeader>
@@ -171,10 +175,10 @@ export default function FirstRunInstaller() {
           </div>
         </div>
 
-        <Card>
+        <Card className="border-slate-800/80 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Bootstrap Workspace</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl text-white">Bootstrap Workspace</CardTitle>
+            <CardDescription className="text-slate-400">
               This installer is available only on a fresh production database.
             </CardDescription>
           </CardHeader>
@@ -293,7 +297,8 @@ export default function FirstRunInstaller() {
             </form>
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </AppSurface>
   )
 }

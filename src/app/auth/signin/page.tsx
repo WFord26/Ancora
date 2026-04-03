@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertCircle, Loader2 } from "lucide-react"
+import AppSurface from "@/components/layout/app-surface"
 
 export default function SignInPage() {
   const router = useRouter()
@@ -52,16 +53,17 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-background">
-      <div className="w-full max-w-sm space-y-6">
+    <AppSurface>
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-sm space-y-6">
         <div className="flex justify-center mb-6">
           <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600" />
         </div>
 
-        <Card>
+        <Card className="border-slate-800/80 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
           <CardHeader className="space-y-2">
-            <CardTitle className="text-2xl">Sign In</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-2xl text-white">Sign In</CardTitle>
+            <CardDescription className="text-slate-400">
               Enter your credentials to access the app
             </CardDescription>
           </CardHeader>
@@ -107,10 +109,11 @@ export default function SignInPage() {
             </form>
 
             <div className="mt-6 text-center text-sm text-muted-foreground">
-              <p>Need to bootstrap this instance?{" "}
+              <p className="text-slate-400">
+                Need to bootstrap this instance?{" "}
                 <Link
                   href="/auth/landing/setup"
-                  className="font-medium text-foreground hover:underline"
+                  className="font-medium text-sky-300 hover:underline"
                 >
                   Run the installer
                 </Link>
@@ -118,7 +121,8 @@ export default function SignInPage() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
-    </div>
+    </AppSurface>
   )
 }

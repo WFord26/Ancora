@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
+import AppSurface from "@/components/layout/app-surface"
 
 export default function PortalLoginPage() {
   const router = useRouter()
@@ -74,25 +76,26 @@ export default function PortalLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="w-full max-w-md space-y-8 p-8">
+    <AppSurface>
+      <div className="flex min-h-screen items-center justify-center px-4 py-12">
+        <div className="w-full max-w-md space-y-8 rounded-[28px] border border-slate-800/80 bg-slate-900/60 p-8 shadow-2xl shadow-slate-950/30 backdrop-blur">
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Ancora</h1>
-          <p className="mt-1 text-lg text-muted-foreground">Client Portal</p>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <h1 className="text-3xl font-bold text-white">Ancora</h1>
+          <p className="mt-1 text-lg text-slate-300">Client Portal</p>
+          <p className="mt-2 text-sm text-slate-400">
             Sign in to view your retainers, invoices, and make payments
           </p>
         </div>
 
         {/* Mode Tabs */}
-        <div className="flex rounded-lg border bg-muted p-1">
+        <div className="flex rounded-lg border border-slate-800 bg-slate-950/70 p-1">
           <button
             type="button"
             onClick={() => { setMode("password"); setError(""); setSuccess("") }}
             className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
               mode === "password"
-                ? "bg-background shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-slate-800 text-white shadow-sm"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             Password
@@ -102,8 +105,8 @@ export default function PortalLoginPage() {
             onClick={() => { setMode("magic"); setError(""); setSuccess("") }}
             className={`flex-1 rounded-md py-2 text-sm font-medium transition-colors ${
               mode === "magic"
-                ? "bg-background shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-slate-800 text-white shadow-sm"
+                : "text-slate-400 hover:text-white"
             }`}
           >
             Magic Link
@@ -117,7 +120,7 @@ export default function PortalLoginPage() {
         )}
 
         {success && (
-          <div className="rounded-md bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 p-3 text-sm text-green-800 dark:text-green-200">
+          <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
             {success}
           </div>
         )}
@@ -125,7 +128,7 @@ export default function PortalLoginPage() {
         {mode === "password" ? (
           <form onSubmit={handlePasswordLogin} className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-200">
                 Email
               </label>
               <input
@@ -134,13 +137,13 @@ export default function PortalLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
                 placeholder="you@company.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-200">
                 Password
               </label>
               <input
@@ -149,7 +152,7 @@ export default function PortalLoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
                 placeholder="••••••••"
               />
             </div>
@@ -165,7 +168,7 @@ export default function PortalLoginPage() {
         ) : (
           <form onSubmit={handleMagicLink} className="space-y-4">
             <div>
-              <label htmlFor="magic-email" className="block text-sm font-medium">
+              <label htmlFor="magic-email" className="block text-sm font-medium text-slate-200">
                 Email
               </label>
               <input
@@ -174,10 +177,10 @@ export default function PortalLoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                className="mt-1 block w-full rounded-md border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-400"
                 placeholder="you@company.com"
               />
-              <p className="mt-2 text-xs text-muted-foreground">
+              <p className="mt-2 text-xs text-slate-400">
                 We&apos;ll send a one-time login link to your email address.
               </p>
             </div>
@@ -192,10 +195,14 @@ export default function PortalLoginPage() {
           </form>
         )}
 
-        <p className="text-center text-xs text-muted-foreground">
-          Staff? <a href="/auth/signin" className="text-primary hover:underline">Sign in here</a>
+        <p className="text-center text-xs text-slate-400">
+          Staff?{" "}
+          <Link href="/auth/signin" className="text-sky-300 hover:underline">
+            Sign in here
+          </Link>
         </p>
+        </div>
       </div>
-    </div>
+    </AppSurface>
   )
 }

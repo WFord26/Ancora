@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react"
 import { Loader2, LogOut } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import AppSurface from "@/components/layout/app-surface"
 
 type LogoutPageProps = {
   callbackUrl: string
@@ -33,14 +34,15 @@ export default function LogoutPage({ callbackUrl }: LogoutPageProps) {
   }, [callbackUrl])
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 px-4">
-      <Card className="w-full max-w-md border-border/60 shadow-lg">
+    <AppSurface>
+      <div className="flex min-h-screen items-center justify-center px-4">
+        <Card className="w-full max-w-md border-slate-800/80 bg-slate-900/60 shadow-2xl shadow-slate-950/30 backdrop-blur">
         <CardHeader className="text-center">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-sky-500/10 text-sky-300">
             {error ? <LogOut className="h-6 w-6" /> : <Loader2 className="h-6 w-6 animate-spin" />}
           </div>
-          <CardTitle className="text-2xl">Signing you out</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-2xl text-white">Signing you out</CardTitle>
+          <CardDescription className="text-slate-400">
             {error
               ? "Your session is still active until sign-out completes."
               : "We’re closing your session and sending you back to the landing page."}
@@ -74,7 +76,8 @@ export default function LogoutPage({ callbackUrl }: LogoutPageProps) {
             <Link href={callbackUrl}>Return Without Signing Out</Link>
           </Button>
         </CardContent>
-      </Card>
-    </div>
+        </Card>
+      </div>
+    </AppSurface>
   )
 }
